@@ -88,21 +88,26 @@ function fakeElement() {
   };
 }
 
-/* In-memory Web Storage stand-in that records every call. */
+/* In-memory Web Storage stand-in that records every call. Set failWrites to simulate a full disk. */
 function fakeLocalStorage() {
   const data = new Map();
   const calls = [];
   return {
-    calls, data,
+    calls, data, failWrites: false,
     getItem(k) { calls.push(['getItem', k]); return data.has(k) ? data.get(k) : null; },
-    setItem(k, v) { calls.push(['setItem', k]); data.set(k, String(v)); },
+    setItem(k, v) {
+      calls.push(['setItem', k]);
+      if (this.failWrites && k !== '__t') throw new Error('QuotaExceededError');
+      data.set(k, String(v));
+    },
     removeItem(k) { calls.push(['removeItem', k]); data.delete(k); },
   };
 }
 
 /* Boots the full app script. `windowStorage` simulates the Claude artifact API;
-   `localStorage` simulates a browser. Omit both for the in-memory fallback. */
-async function bootApp({ now = Date.now(), windowStorage, localStorage } = {}) {
+   `localStorage` simulates a browser. Omit both for the in-memory fallback.
+   `confirm` answers window.confirm(); by default any confirm() call fails the test. */
+async function bootApp({ now = Date.now(), windowStorage, localStorage, confirm } = {}) {
   const els = new Map();
   const document = {
     getElementById(id) {
@@ -110,7 +115,16 @@ async function bootApp({ now = Date.now(), windowStorage, localStorage } = {}) {
       return els.get(id);
     },
   };
-  const sandbox = { document, console, navigator: {}, setTimeout: () => 0, clearTimeout() {} };
+  const confirms = [];
+  const sandbox = {
+    document, console, navigator: {}, setTimeout: () => 0, clearTimeout() {},
+    location: { reload() {} },
+    confirm: msg => {
+      confirms.push(msg);
+      if (!confirm) throw new Error(`unexpected confirm(): ${msg}`);
+      return confirm(msg);
+    },
+  };
   sandbox.window = sandbox;
   if (windowStorage) sandbox.storage = windowStorage;
   if (localStorage) sandbox.localStorage = localStorage;
@@ -120,7 +134,7 @@ async function bootApp({ now = Date.now(), windowStorage, localStorage } = {}) {
   await settle();
   const run = code => vm.runInContext(code, ctx);
   return {
-    ctx, els, run,
+    ctx, els, run, confirms,
     state: () => plain(run('ST')),
     call: async code => { await run(`(async () => { ${code} })()`); await settle(); },
   };

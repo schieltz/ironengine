@@ -6,7 +6,7 @@ Single-file PWA (`index.html`, ~780 lines, vanilla JS, zero dependencies) replic
 Live: https://schieltz.github.io/ironengine/
 
 ## Architecture (single file, three layers)
-1. **Storage adapter** (`store`, top of script): window.storage → localStorage (`ironengine:` prefix) → in-memory. Swap here for any new backend.
+1. **Storage adapter** (`store`, top of script): mode picked once at startup: `claude` (window.storage) → `local` (localStorage, `ironengine:` prefix, only when window.storage is absent) → `memory`. `get()` distinguishes "nothing saved" from "read failed"; a failed read or unparseable/newer-version data blocks all saves and shows a recovery sheet (Retry / Copy raw / Start fresh, which backs the raw data up to `state2.unreadable-<ts>` first). Failed writes and memory mode show a persistent banner. Swap here for any new backend.
 2. **Pure-function engine**, delimited by `@engine:begin` / `@engine:end` comments: `RULES` (every tunable coefficient), `RIR_RAMP`, `DELOAD_RIR`, `rirFor()`, `prescribe()`, `startingSets()`, `roundLoad()`, `weeksSince()`. No DOM, storage, or app state (enforced by a test). Calibration = change a `RULES` value + add a test; the Engine tab renders from `RULES`, so its text can't drift.
 3. **UI**: five views (Workout / Library / Builder / Engine / Data), string-template rendering, no framework.
 

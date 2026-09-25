@@ -111,3 +111,82 @@ describe('state schema', () => {
     assert.equal(JSON.parse(ls.data.get('ironengine:state2')).v, app.run('SCHEMA_VERSION'));
   });
 });
+
+describe('storage failures never overwrite saved data', () => {
+  test('corrupt saved JSON: raw data untouched, saving blocked, recovery sheet shown', async () => {
+    const ls = fakeLocalStorage();
+    const corrupt = '{"v":1,"meso":{"name":"MY REAL DATA"';
+    ls.data.set('ironengine:state2', corrupt);
+    const app = await bootApp({ now: NOW, localStorage: ls });
+    await app.call('await pickWeek(3); await save();');
+    assert.equal(ls.data.get('ironengine:state2'), corrupt);
+    assert.match(app.els.get('modalRoot').innerHTML, /Couldn't read saved data/);
+  });
+
+  test('saved data from a newer app version is not overwritten', async () => {
+    const ls = fakeLocalStorage();
+    const future = JSON.stringify({ v: 99, meso: { name: 'future' }, hist: {} });
+    ls.data.set('ironengine:state2', future);
+    const app = await bootApp({ now: NOW, localStorage: ls });
+    assert.equal(ls.data.get('ironengine:state2'), future);
+    assert.match(app.els.get('modalRoot').innerHTML, /newer app version/);
+  });
+
+  test('window.storage read error: nothing written back', async () => {
+    const writes = [];
+    const ws = { async get() { throw new Error('network blip'); }, async set(k, v) { writes.push(k); } };
+    const app = await bootApp({ now: NOW, windowStorage: ws });
+    await app.call('await save();');
+    assert.deepEqual(writes, []);
+    assert.match(app.els.get('modalRoot').innerHTML, /network blip/);
+  });
+
+  for (const [label, get] of [
+    ['returns null', async () => null],
+    ['throws "not found"', async () => { throw new Error('Key not found'); }],
+  ]) {
+    test(`window.storage get() ${label} for a first run: seed is saved`, async () => {
+      const data = new Map();
+      await bootApp({ now: NOW, windowStorage: { get, async set(k, v) { data.set(k, v); } } });
+      assert.equal(JSON.parse(data.get('state2')).meso.name, 'New meso plan');
+    });
+  }
+
+  test('"Start fresh" keeps the unreadable data under a backup key first', async () => {
+    const ls = fakeLocalStorage();
+    ls.data.set('ironengine:state2', '{broken');
+    const app = await bootApp({ now: NOW, localStorage: ls, confirm: () => true });
+    await app.call('await startFresh();');
+    const backups = [...ls.data.keys()].filter(k => k.startsWith('ironengine:state2.unreadable-'));
+    assert.equal(backups.length, 1);
+    assert.equal(ls.data.get(backups[0]), '{broken');
+    assert.equal(JSON.parse(ls.data.get('ironengine:state2')).meso.name, 'New meso plan');
+    assert.equal(app.els.get('modalRoot').innerHTML, '');
+  });
+
+  test('declining "Start fresh" changes nothing', async () => {
+    const ls = fakeLocalStorage();
+    ls.data.set('ironengine:state2', '{broken');
+    const app = await bootApp({ now: NOW, localStorage: ls, confirm: () => false });
+    await app.call('await startFresh();');
+    assert.equal(ls.data.get('ironengine:state2'), '{broken');
+    assert.equal(ls.data.size, 1);
+  });
+
+  test('failed write shows a banner; it clears once saving works again', async () => {
+    const ls = fakeLocalStorage();
+    const app = await bootApp({ now: NOW, localStorage: ls });
+    ls.failWrites = true;
+    await app.call('await save();');
+    assert.match(app.els.get('banner').innerHTML, /Last save failed/);
+    ls.failWrites = false;
+    await app.call('await save();');
+    assert.equal(app.els.get('banner').innerHTML, '');
+  });
+
+  test('no storage at all: banner says nothing is being saved', async () => {
+    const app = await bootApp({ now: NOW });
+    assert.equal(app.run('store.mode'), 'memory');
+    assert.match(app.els.get('banner').innerHTML, /nothing is being saved/);
+  });
+});

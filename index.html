@@ -92,6 +92,11 @@ nav button.active{color:var(--blue)}
 .eng-block h3{font-size:15px;font-weight:800;color:var(--blue);letter-spacing:.3px;margin-bottom:6px}
 .eng-block p{font-size:13.5px;color:var(--ink-dim);line-height:1.55}
 .eng-block code{background:var(--panel2);padding:1px 6px;border-radius:5px;font-size:12.5px;color:var(--ink)}
+.banner{margin-top:8px;background:#3A1C18;border:1px solid var(--red);color:#F0B8B0;font-size:13px;font-weight:600;
+  padding:10px 12px;border-radius:9px;line-height:1.35}
+.sheet-p{color:var(--ink-dim);font-size:14px;line-height:1.45;margin-top:8px}
+.sheet-stack{display:flex;flex-direction:column;gap:10px;margin-top:20px}
+.sheet-stack button{min-height:48px;padding:13px;border-radius:11px;font-size:15px;font-weight:700;text-align:center}
 .toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%);background:var(--panel2);
   border:1px solid var(--blue);color:var(--ink);padding:11px 18px;border-radius:11px;font-size:14px;font-weight:600;
   z-index:50;white-space:nowrap;opacity:0;transition:opacity .25s;pointer-events:none}
@@ -140,6 +145,7 @@ nav button.active{color:var(--blue)}
 <header>
   <div class="h-title" id="hTitle"></div>
   <div class="h-sub" id="hSub"></div>
+  <div id="banner"></div>
 </header>
 <div class="spine" id="spine"></div>
 <div class="daytabs" id="daytabs"></div>
@@ -159,16 +165,35 @@ nav button.active{color:var(--blue)}
    IRON ENGINE v2
    catalog + cross-meso history + meso builder + R8 soreness
    ============================================================ */
+/* Storage adapter. Mode is picked once at startup:
+   'claude' → window.storage (Claude artifact) · 'local' → localStorage, ONLY when window.storage
+   is absent (self-hosted, e.g. GitHub Pages) · 'memory' → nothing persists (a banner warns).
+   get() → {ok:true, value, raw} (value null = nothing saved yet) or {ok:false, error, raw}.
+   A failed read is never reported as "nothing saved", so the app can't overwrite real data with the seed. */
 const store = {
-  mem:{}, _ls:false,
-  init(){ /* localStorage path is for SELF-HOSTED deploys (GitHub Pages) only; never runs inside Claude where window.storage exists */
-    if(!window.storage){ try{ localStorage.setItem('__t','1'); localStorage.removeItem('__t'); this._ls=true; }catch(e){} } },
-  async get(k){ try{ if(window.storage){ const r=await window.storage.get(k); return r?JSON.parse(r.value):null; } }catch(e){}
-    if(this._ls){ try{ const v=localStorage.getItem('ironengine:'+k); return v?JSON.parse(v):null; }catch(e){} }
+  mem:{}, mode:'memory',
+  init(){
+    if(window.storage){ this.mode='claude'; return; }
+    try{ localStorage.setItem('__t','1'); localStorage.removeItem('__t'); this.mode='local'; }catch(e){} },
+  async getRaw(k){ /* string | null; throws when the read itself fails */
+    if(this.mode==='claude'){
+      try{ const r=await window.storage.get(k); return r?r.value:null; }
+      catch(e){ if(/not.?found|does not exist|no such key/i.test(String(e&&e.message))) return null; throw e; } }
+    if(this.mode==='local') return localStorage.getItem('ironengine:'+k);
     return this.mem[k]??null; },
-  async set(k,v){ this.mem[k]=v;
-    try{ if(window.storage){ await window.storage.set(k,JSON.stringify(v)); return; } }catch(e){}
-    if(this._ls){ try{ localStorage.setItem('ironengine:'+k,JSON.stringify(v)); }catch(e){} } }
+  async get(k){
+    let raw;
+    try{ raw=await this.getRaw(k); }catch(error){ return {ok:false,error,raw:null}; }
+    if(raw==null) return {ok:true,value:null,raw:null};
+    try{ return {ok:true,value:JSON.parse(raw),raw}; }catch(error){ return {ok:false,error,raw}; } },
+  async setRaw(k,s){ /* true only when actually persisted */
+    this.mem[k]=s;
+    try{
+      if(this.mode==='claude'){ await window.storage.set(k,s); return true; }
+      if(this.mode==='local'){ localStorage.setItem('ironengine:'+k,s); return true; }
+    }catch(e){}
+    return false; },
+  set(k,v){ return this.setRaw(k,JSON.stringify(v)); }
 };
 store.init();
 const DAYS=['Mon','Wed','Fri'];
@@ -457,17 +482,63 @@ let libQ='', libMg='ALL', libHome=true, swapCtx=null, bdDay=1;
 const $=id=>document.getElementById(id);
 function toast(t){ const el=$('toast'); el.textContent=t; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),1900); }
 const esc=s=>s.replace(/'/g,"\\'");
+const escHtml=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]);
 
+let loadError=null;   /* saved data exists but couldn't be read: saving is blocked until the user decides */
+let saveFailed=false;
 async function init(){
-  const saved=await store.get('state2');
-  const upgrading=saved&&saved.v!==SCHEMA_VERSION;
-  ST=saved?migrate(saved):seedState();
+  const r=await store.get('state2');
+  let saved=null, upgrading=false;
+  if(!r.ok) loadError=r;
+  else if(r.value){
+    try{ upgrading=r.value.v!==SCHEMA_VERSION; saved=migrate(r.value); }
+    catch(error){ loadError={error,raw:r.raw}; }
+  }
+  ST=saved||seedState();
   selWeek=ST.meso.curWeek; selDay=ST.meso.curDay;
   await ensureDay(selWeek,selDay);
   if(upgrading) await save();
   render();
+  if(loadError) renderLoadError();
 }
-async function save(){ await store.set('state2',ST); }
+async function save(){
+  if(loadError) return;   /* never write over data we couldn't read */
+  const ok=await store.set('state2',ST);
+  if(saveFailed===ok){ saveFailed=!ok; renderBanner(); }
+}
+function renderBanner(){
+  const msg=store.mode==='memory'?'Storage is blocked in this browser: nothing is being saved. Export a backup before closing.'
+    :saveFailed?'Last save failed (storage full or blocked). Export a backup now.':'';
+  $('banner').innerHTML=msg?`<div class="banner" onclick="setView('data')">⚠ ${msg}</div>`:'';
+}
+function renderLoadError(){
+  const e=loadError, detail=escHtml(e.error&&e.error.message||e.error||'unknown error');
+  $('modalRoot').innerHTML=`<div class="overlay"><div class="sheet">
+    <h2>Couldn't read saved data</h2>
+    <p class="sheet-p">Nothing has been changed or overwritten, and nothing will be saved until you choose below.</p>
+    <p class="sheet-p" style="color:var(--ink-faint)">${detail}</p>
+    <div class="sheet-stack">
+      <button class="btn-primary" onclick="location.reload()">Retry</button>
+      ${e.raw?`<button class="btn-ghost" onclick="copyRaw()">Copy raw saved data</button>`:''}
+      <button class="btn-ghost" style="color:var(--red)" onclick="startFresh()">Start fresh</button>
+    </div></div></div>`;
+}
+async function copyRaw(){
+  try{ await navigator.clipboard.writeText(loadError.raw); toast('Copied'); }catch(e){ toast('Clipboard blocked'); }
+}
+/* Clears a load error by overwriting. Unreadable raw data is copied to a backup key first. */
+async function overwriteUnreadable(){
+  if(loadError.raw && !await store.setRaw(`state2.unreadable-${Date.now()}`,loadError.raw)){
+    toast('Could not back up the old data, so nothing was overwritten'); return false; }
+  loadError=null; $('modalRoot').innerHTML=''; return true;
+}
+async function startFresh(){
+  if(!confirm(loadError.raw?'Start fresh? The unreadable data is kept under a backup key first.'
+    :'Start fresh? This replaces whatever is saved. If the problem was temporary, choose Retry instead.')) return;
+  if(!await overwriteUnreadable()) return;
+  ST=seedState(); selWeek=ST.meso.curWeek; selDay=ST.meso.curDay;
+  await ensureDay(selWeek,selDay); await save(); view='workout'; render();
+}
 function key(w,d){ return `w${w}d${d}`; }
 
 async function ensureDay(w,d){
@@ -487,7 +558,7 @@ async function ensureDay(w,d){
 }
 
 function render(){
-  renderHeader(); renderSpine(); renderTabs();
+  renderHeader(); renderBanner(); renderSpine(); renderTabs();
   ({workout:renderWorkout,library:renderLibrary,builder:renderBuilder,engine:renderEngine,data:renderData})[view]();
   ['navW','navL','navB','navE','navD'].forEach(id=>$(id).classList.remove('active'));
   $({workout:'navW',library:'navL',builder:'navB',engine:'navE',data:'navD'}[view]).classList.add('active');
@@ -803,8 +874,10 @@ function renderData(){
   $('main').innerHTML=`
   <div class="eng-block"><h3>Export</h3><p>Full state (meso + history + draft) as JSON.</p>
     <div class="card-actions"><button onclick="doExport()">Copy JSON</button></div></div>
-  <div class="eng-block"><h3>Storage</h3>
-    <p>Persists via this app's storage. Self-hosting: swap the <code>store</code> adapter (one object, top of source).</p></div>
+  <div class="eng-block"><h3>Storage</h3><p>${{
+    claude:'Saved in Claude artifact storage.',
+    local:'Saved in this browser only. On iPhone, the home-screen app and Safari keep separate copies: always use the same one. Back up regularly.',
+    memory:'<b style="color:var(--red)">Not being saved.</b> This browser blocks storage; everything is lost when the app closes. Export now.'}[store.mode]}</p></div>
   <div class="eng-block"><h3>Reset</h3><p>Restores the RP-screenshot seed. Destroys changes.</p>
     <div class="card-actions"><button onclick="doReset()" style="color:var(--red)">Reset to seed</button></div></div>`;
 }
