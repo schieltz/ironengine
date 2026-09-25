@@ -355,8 +355,8 @@ const TEMPLATES=[
 /* ---------- seed current meso (from RP screenshots) ---------- */
 function seedState(){
   const ex=(name,note)=>{const c=CAT_BY_NAME[name]||{mg:'BACK',equip:'?'};
-    return {name,mg:c.mg,equip:c.equip,note:note||null,feedback:null};};
-  const meso={name:'New meso plan',weeks:5,curWeek:2,curDay:3,days:[[],[],[]],log:{}};
+    return {name,mg:c.mg,equip:c.equip,note:note||null};};
+  const meso={name:'New meso plan',weeks:5,curWeek:2,curDay:3,days:[[],[],[]],log:{},fb:{}};
   meso.days[0]=[ex('Dip (Weighted, Triceps-Focused)'),ex('Cable Triceps Pushdown (Bar)'),
     ex('Cable Upright Row'),ex('Cable Curl','Straight bar'),ex('Bench Press (Medium Grip)'),ex('Romanian Deadlift')];
   meso.days[1]=[ex('EZ Bar Curl (Normal Grip)'),ex('Hammer Curl'),ex('Bench Press (Close Grip)'),
@@ -386,8 +386,27 @@ function seedState(){
    Saved state carries v; unversioned saves are v1. To change the stored shape:
    bump SCHEMA_VERSION, append the upgrade step to MIGRATIONS, update seedState(),
    and add a migration test. */
-const SCHEMA_VERSION=1;
-const MIGRATIONS=[];   /* MIGRATIONS[n-1] upgrades a v(n) state to v(n+1), in place */
+const SCHEMA_VERSION=2;
+const MIGRATIONS=[   /* MIGRATIONS[n-1] upgrades a v(n) state to v(n+1), in place */
+  /* v1→v2: feedback moves off the exercise (where it applied to every later week) into
+     meso.fb[session][exercise]. A legacy answer is attributed to the latest week of that
+     day with anything logged, i.e. the session it most plausibly described. */
+  s=>{
+    const M=s.meso; M.fb={};
+    M.days.forEach((day,di)=>day.forEach((ex,i)=>{
+      if(ex.feedback){
+        let last=0;
+        for(const k of Object.keys(M.log)){
+          const m=/^w(\d+)d(\d+)$/.exec(k);
+          if(m && +m[2]===di+1 && (M.log[k][i]||[]).some(x=>x&&x.st)) last=Math.max(last,+m[1]);
+        }
+        if(last) (M.fb[key(last,di+1)]=M.fb[key(last,di+1)]||[])[i]=ex.feedback;
+      }
+      delete ex.feedback;
+    }));
+    if(s.draft) s.draft.days.forEach(day=>day.forEach(ex=>delete ex.feedback));
+  },
+];
 function migrate(s){
   let v=s.v||1;
   if(v>SCHEMA_VERSION) throw new Error(`Saved data is from a newer app version (v${v}). Reload to update the app.`);
@@ -545,6 +564,8 @@ function key(w,d){ return `w${w}d${d}`; }
    Every visit recomputes untouched exercises from the prior week, so looking ahead never freezes
    stale numbers. Touched exercises are yours and are never recomputed. */
 const touched=sets=>!!sets&&sets.some(s=>s.st||s.u);
+/* feedback given in session k for exercise i; it shapes the next week's prescription */
+const fbFor=(k,i)=>(ST.meso.fb[k]||[])[i]||null;
 async function ensureDay(w,d){ if(planDay(w,d)) await save(); }
 function planDay(w,d){ /* returns true when anything changed */
   const M=ST.meso, k=key(w,d), exs=M.days[d-1];
@@ -558,7 +579,7 @@ function planDay(w,d){ /* returns true when anything changed */
     let p;
     if(w===1) p=startingSets(ex.name,ST.hist,rirFor(1),ex.pri===0?1:2);
     else{
-      p=prescribe(ex,prev[i],w,ex.feedback);
+      p=prescribe(ex,prev[i],w,fbFor(key(w-1,d),i));
       if(!prev[i].some(s=>s.st)) p.why=`Preview: ${DAYS[d-1]} week ${w-1} isn't logged yet, so this repeats its weights `
         +`at <b>${rirFor(w)} RIR</b>. Updates automatically once you log it.`;
     }
@@ -630,7 +651,7 @@ function renderWorkout(){
       ${why}
       <div class="card-actions">
         <button onclick="addSet(${i})">+ Set</button>
-        <button class="${ex.feedback?'fb-done':''}" onclick="openFeedback(${i})">${ex.feedback?'✓ Feedback':'Feedback'}</button>
+        <button class="${fbFor(k,i)?'fb-done':''}" onclick="openFeedback(${i})">${fbFor(k,i)?'✓ Feedback':'Feedback'}</button>
       </div>
     </div>`;
   });
@@ -680,9 +701,8 @@ async function addSet(ei){
 /* ---------- feedback (now incl. soreness R8) ---------- */
 let fbState=null;
 function openFeedback(ei){
-  const ex=ST.meso.days[selDay-1][ei];
-  fbState={ei,soreness:ex.feedback?.soreness??null,pain:ex.feedback?.pain??null,
-    pump:ex.feedback?.pump??null,workload:ex.feedback?.workload??null};
+  const f=fbFor(key(selWeek,selDay),ei)||{};
+  fbState={ei,soreness:f.soreness??null,pain:f.pain??null,pump:f.pump??null,workload:f.workload??null};
   renderFB();
 }
 function renderFB(){
@@ -710,8 +730,8 @@ function renderFB(){
 const cap=s=>s[0]+s.slice(1).toLowerCase();
 function closeFB(){ $('modalRoot').innerHTML=''; fbState=null; }
 async function saveFB(){
-  const ex=ST.meso.days[selDay-1][fbState.ei];
-  ex.feedback={soreness:fbState.soreness,pain:fbState.pain,pump:fbState.pump,workload:fbState.workload};
+  const M=ST.meso, k=key(selWeek,selDay);
+  (M.fb[k]=M.fb[k]||[])[fbState.ei]={soreness:fbState.soreness,pain:fbState.pain,pump:fbState.pump,workload:fbState.workload};
   await save(); closeFB(); render(); toast('Saved — feeds next week (R2/R4/R5/R8)');
 }
 
@@ -780,7 +800,7 @@ function renderBuilder(){
 async function makeDraft(){
   const M=ST.meso;
   ST.draft={name:'Next meso (draft)',weeks:5,
-    days:M.days.map(day=>day.map(ex=>({name:ex.name,mg:ex.mg,equip:ex.equip,note:ex.note,pri:ex.pri??1,feedback:null})))};
+    days:M.days.map(day=>day.map(ex=>({name:ex.name,mg:ex.mg,equip:ex.equip,note:ex.note,pri:ex.pri??1})))};
   bdDay=1; await save(); render();
 }
 /* most recently performed home-compatible exercise per mg, excluding already-used names */
@@ -796,7 +816,7 @@ async function makeDraftFromTemplate(ti){
     return day.map(([mg,pri,pinned])=>{
       const c=pinned&&CAT_BY_NAME[pinned]?CAT_BY_NAME[pinned]:autoPick(mg,used);
       used.add(c.name);
-      return {name:c.name,mg,equip:c.equip,note:null,pri,feedback:null,_auto:!pinned};
+      return {name:c.name,mg,equip:c.equip,note:null,pri,_auto:!pinned};
     });
   })};
   bdDay=1; await save(); render();
@@ -853,7 +873,7 @@ async function activateDraft(){
   });
   const D=ST.draft;
   ST.meso={name:D.name.replace(' (draft)','')+' · '+new Date().toISOString().slice(0,10),weeks:D.weeks,curWeek:1,curDay:1,
-    days:D.days.map(day=>day.map(ex=>({name:ex.name,mg:ex.mg,equip:ex.equip,note:ex.note,pri:ex.pri??1,feedback:null}))),log:{}};
+    days:D.days.map(day=>day.map(ex=>({name:ex.name,mg:ex.mg,equip:ex.equip,note:ex.note,pri:ex.pri??1}))),log:{},fb:{}};
   ST.draft=null; selWeek=1; selDay=1;
   await ensureDay(1,1); await save();
   view='workout'; render(); toast('New meso active — history carried forward');

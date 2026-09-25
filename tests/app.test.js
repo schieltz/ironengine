@@ -241,3 +241,56 @@ describe('provisional prescriptions (looking ahead never freezes numbers)', () =
     assert.equal(ls.calls.filter(c => c[0] === 'setItem' && c[1] === 'ironengine:state2').length, writes);
   });
 });
+
+/* answer the feedback sheet for exercise ei in the current session */
+const giveFeedback = (app, ei, f) => app.call(
+  `openFeedback(${ei}); Object.assign(fbState, ${JSON.stringify(f)}); await saveFB();`);
+const NEUTRAL = { soreness: 2, pain: 0, pump: 1, workload: 1 };
+
+describe('feedback belongs to one session (C2)', () => {
+  test('pain in week 2 holds week 3 only; week 4 progresses normally', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('selDay=2; await pickWeek(2);');
+    await giveFeedback(app, 2, { ...NEUTRAL, pain: 2 });            // close-grip bench, Wed
+    await app.call('await pickWeek(3);');
+    assert.deepEqual(app.state().meso.log.w3d2[2], [target(120, 12), target(120, 11)]);
+
+    await logReps(app, 'w3d2', 2, [12, 11]);
+    await app.call('await pickWeek(4);');
+    assert.deepEqual(app.state().meso.log.w4d2[2], [target(120, 13), target(120, 12), rirOnly(120, 1)]);
+  });
+
+  test('feedback given after peeking at next week still takes effect', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('selDay=2; await pickWeek(3); await pickWeek(2);');
+    await giveFeedback(app, 2, { ...NEUTRAL, workload: 3 });        // "too much" -> hold sets
+    await app.call('await pickWeek(3);');
+    assert.equal(app.state().meso.log.w3d2[2].length, 2);
+  });
+
+  test('the feedback checkmark shows only in the session it was given', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('selDay=2; await pickWeek(2);');
+    await giveFeedback(app, 2, NEUTRAL);
+    assert.equal(app.els.get('main').innerHTML.split('✓ Feedback').length - 1, 1);
+    await app.call('await pickWeek(3);');
+    assert.equal(app.els.get('main').innerHTML.split('✓ Feedback').length - 1, 0);
+  });
+
+  test('v1 migration moves legacy per-exercise feedback to its latest logged session', async () => {
+    const ls = fakeLocalStorage();
+    const legacy = (await bootApp({ now: NOW })).state();
+    delete legacy.v; delete legacy.meso.fb;
+    const pain = { ...NEUTRAL, pain: 3 };
+    legacy.meso.days[1][2].feedback = pain;                          // bench Wed: logged in week 2
+    legacy.meso.days[0][0].feedback = NEUTRAL;                       // Mon ex 0: logged in week 2
+    legacy.meso.log.w3d1 = legacy.meso.log.w2d1.map(sets => sets.map(s => ({ ...s, st: null })));
+    ls.data.set('ironengine:state2', JSON.stringify(legacy));
+
+    const st = (await bootApp({ now: NOW, localStorage: ls })).state();
+    assert.equal(st.v, 2);
+    assert.deepEqual(st.meso.fb.w2d2[2], pain);
+    assert.deepEqual(st.meso.fb.w2d1[0], NEUTRAL);                   // week 3 Mon untouched, so week 2
+    assert.ok(st.meso.days.flat().every(ex => !('feedback' in ex)));
+  });
+});
