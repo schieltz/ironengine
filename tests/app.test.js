@@ -78,3 +78,16 @@ describe('storage adapter', () => {
     assert.equal(second.state().meso.name, 'persisted');
   });
 });
+
+describe('Engine tab', () => {
+  test('shows the live RULES coefficients, not hand-copied numbers', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call("setView('engine');");
+    const html = app.els.get('main').innerHTML;
+    const R = app.run('RULES');
+    assert.ok(html.includes(`≤${R.floorReps} reps`));
+    assert.ok(html.includes(`~${Math.round(R.cutPct * 100)}%`));
+    assert.ok(html.includes(`>${R.staleWeeks} wks`));
+    assert.doesNotMatch(html, /\$\{/, 'unrendered template');
+  });
+});

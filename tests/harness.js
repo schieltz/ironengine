@@ -10,9 +10,8 @@ const path = require('node:path');
 const vm = require('node:vm');
 
 const HTML_PATH = process.env.IRONENGINE_HTML || path.join(__dirname, '..', 'index.html');
-const ENGINE_BANNER = 'PROGRESSION ENGINE';
-const UI_BANNER = '/* ============================================================ UI';
-const CONSTANTS_LINE = /^const RIR_RAMP=.*$/m;
+const ENGINE_BEGIN = '@engine:begin';
+const ENGINE_END = '@engine:end';
 
 function readHtml() {
   return fs.readFileSync(HTML_PATH, 'utf8');
@@ -36,17 +35,15 @@ function countOf(haystack, needle) {
   return haystack.split(needle).length - 1;
 }
 
-/* The engine block runs from the PROGRESSION ENGINE banner to the UI banner.
-   It reads RIR_RAMP/DELOAD_RIR, which are declared earlier, so that one line is prepended. */
+/* The engine block is everything between the @engine:begin and @engine:end comments. */
 function engineSource(src = appScript()) {
-  if (countOf(src, ENGINE_BANNER) !== 1) throw new Error(`"${ENGINE_BANNER}" banner must appear exactly once`);
-  if (countOf(src, UI_BANNER) !== 1) throw new Error('UI banner must appear exactly once');
-  const consts = src.match(CONSTANTS_LINE);
-  if (!consts) throw new Error('RIR_RAMP constants line not found');
-  const start = src.lastIndexOf('/*', src.indexOf(ENGINE_BANNER));
-  const end = src.indexOf(UI_BANNER);
-  if (start < 0 || end <= start) throw new Error('engine block markers out of order');
-  return { constants: consts[0], block: src.slice(start, end) };
+  for (const m of [ENGINE_BEGIN, ENGINE_END]) {
+    if (countOf(src, m) !== 1) throw new Error(`"${m}" marker must appear exactly once`);
+  }
+  const start = src.lastIndexOf('/*', src.indexOf(ENGINE_BEGIN));
+  const end = src.indexOf('*/', src.indexOf(ENGINE_END)) + 2;
+  if (start < 0 || end <= start) throw new Error('engine markers out of order');
+  return src.slice(start, end);
 }
 
 /* Replace Date in a sandbox so Date.now() and new Date() both return `now`. */
@@ -66,20 +63,21 @@ function freezeClock(ctx, now) {
 const plain = v => (v === undefined ? v : structuredClone(v));
 
 function loadEngine({ now = Date.now() } = {}) {
-  const { constants, block } = engineSource();
   const ctx = vm.createContext({});
   freezeClock(ctx, now);
-  vm.runInContext(`${constants}\n${block}`, ctx, { filename: 'index.html#engine' });
-  const fns = vm.runInContext('({ roundLoad, weeksSince, startingSets, prescribe })', ctx);
-  const consts = vm.runInContext('({ RIR_RAMP, DELOAD_RIR })', ctx);
+  vm.runInContext(engineSource(), ctx, { filename: 'index.html#engine' });
+  const fns = vm.runInContext('({ roundLoad, weeksSince, startingSets, prescribe, rirFor })', ctx);
+  const consts = vm.runInContext('({ RIR_RAMP, DELOAD_RIR, RULES })', ctx);
   const wrap = f => (...args) => plain(f(...args));
   return {
     roundLoad: fns.roundLoad,
+    rirFor: fns.rirFor,
     weeksSince: fns.weeksSince,
     startingSets: wrap(fns.startingSets),
     prescribe: wrap(fns.prescribe),
     RIR_RAMP: plain(consts.RIR_RAMP),
     DELOAD_RIR: consts.DELOAD_RIR,
+    RULES: plain(consts.RULES),
   };
 }
 

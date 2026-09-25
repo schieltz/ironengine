@@ -171,7 +171,7 @@ const store = {
     if(this._ls){ try{ localStorage.setItem('ironengine:'+k,JSON.stringify(v)); }catch(e){} } }
 };
 store.init();
-const RIR_RAMP=[3,2,2,1,0], DELOAD_RIR=8, DAYS=['Mon','Wed','Fri'];
+const DAYS=['Mon','Wed','Fri'];
 const MGS=['CHEST','BACK','SHOULDERS','TRICEPS','BICEPS','QUADS','GLUTES','HAMSTRINGS','CALVES','FOREARMS'];
 
 /* ---------- exercise catalog: John's performed list from RP ---------- */
@@ -357,12 +357,30 @@ function seedState(){
   return {meso,hist,draft:null};
 }
 
-/* ============================================================
+/* ============================ @engine:begin ============================
    PROGRESSION ENGINE v2 — R1..R8
+   Pure functions only: no DOM, storage, or app state. tests/harness.js runs
+   everything from this banner to the engine:end marker headlessly in node.
    R8 soreness (recovery gate): asked per muscle at next session.
    0 never sore · 1 healed a while ago · 2 healed just on time · 3 still sore
    ============================================================ */
-function roundLoad(w){ return Math.max(5,Math.round(w/5)*5); }
+const RIR_RAMP=[3,2,2,1,0], DELOAD_RIR=8;
+/* Every tunable coefficient. Calibration = change a value here + add a test. */
+const RULES={
+  loadStep:5,          // lb; prescribed loads round to this increment
+  minLoad:5,           // lb; floor for any rounded load
+  cutPct:0.08,         // R3 load cut (60→55 verified; the 8% itself is inferred)
+  floorReps:4,         // R3: a later set at or below this many reps triggers the cut
+  dropFromFirst:3,     // R3: a later set this many reps below set 1 triggers the cut
+  painGate:2,          // R4: pain answer at or above this (2 = moderate) holds reps and sets
+  setAdd:1,            // R2: sets added per exercise per week
+  strongSetAdd:2,      // R5/R8: sets added on an under-stimulated signal
+  staleWeeks:8,        // seeding: history older than this many weeks is discounted
+  staleDiscount:0.10,  // seeding: discount on stale history
+};
+const pct=x=>Math.round(x*100);
+function rirFor(week){ return week>RIR_RAMP.length ? DELOAD_RIR : RIR_RAMP[week-1]; }
+function roundLoad(w){ return Math.max(RULES.minLoad,Math.round(w/RULES.loadStep)*RULES.loadStep); }
 function weeksSince(dateStr){
   return Math.floor((Date.now()-new Date(dateStr).getTime())/(7*86400*1000));
 }
@@ -373,31 +391,32 @@ function startingSets(name,hist,rir,nSets){
   if(!h){ return {sets:mk(null),
     why:`No history for this exercise → enter a weight you can handle at ${rir} RIR; that seeds the engine.${n===1?' Maintenance-priority slot: 1 starting set.':''}`}; }
   let w=h.w; const wk=weeksSince(h.date);
-  if(wk>8){ w=roundLoad(w*0.9); why.push(`Last performed ${wk} wks ago → starting load discounted 10% to <b>${w}</b> (detraining buffer).`); }
+  if(wk>RULES.staleWeeks){ w=roundLoad(w*(1-RULES.staleDiscount));
+    why.push(`Last performed ${wk} wks ago → starting load discounted ${pct(RULES.staleDiscount)}% to <b>${w}</b> (detraining buffer).`); }
   else why.push(`Seeded from your last top set: <b>${w}</b>.`);
   why.push(`Work to ${rir} RIR — week 1 results become the baseline.`);
   if(n===1) why.push(`Maintenance-priority slot: 1 starting set.`);
   return {sets:mk(w),why:why.join(' ')};
 }
 function prescribe(ex, prevSets, week, feedback){
-  const rir = week>5 ? DELOAD_RIR : RIR_RAMP[week-1];
+  const rir = rirFor(week);
   const why=[];
   const logged=(prevSets||[]).filter(s=>s && s.st==='logged' && s.reps!=null);
   if(!prevSets || logged.length===0){
     const base=(prevSets&&prevSets.length?prevSets:[{w:0}]).map(s=>({w:s.w,tgt:null,rir,st:null,reps:null}));
     return {sets:base,why:`No logged sets last week → same weights, work to <b>${rir} RIR</b> (R6).`};
   }
-  if(week>5){
+  if(week>RIR_RAMP.length){
     const n=Math.max(1,Math.ceil(logged.length/2));
     return {sets:logged.slice(0,n).map(s=>({w:s.w,tgt:null,rir:DELOAD_RIR,st:null,reps:null})),
-      why:`Deload: <b>${n} set${n>1?'s':''}</b> at 8 RIR — dissipate fatigue (R7).`};
+      why:`Deload: <b>${n} set${n>1?'s':''}</b> at ${DELOAD_RIR} RIR — dissipate fatigue (R7).`};
   }
   const f=feedback||{};
-  const painGate=f.pain>=2, soreGate=f.soreness===3;
+  const painGate=f.pain>=RULES.painGate, soreGate=f.soreness===3;
   const firstReps=logged[0].reps;
   const sets=logged.map((s,i)=>{
-    if(i>0 && (s.reps<=4 || (firstReps-s.reps)>=3)){
-      const w=roundLoad(s.w*0.92);
+    if(i>0 && (s.reps<=RULES.floorReps || (firstReps-s.reps)>=RULES.dropFromFirst)){
+      const w=roundLoad(s.w*(1-RULES.cutPct));
       why.push(`Set ${i+1}: ${s.reps} reps last week (below range floor) → load cut to <b>${w}</b>, ${rir} RIR (R3).`);
       return {w,tgt:null,rir,st:null,reps:null};
     }
@@ -409,13 +428,14 @@ function prescribe(ex, prevSets, week, feedback){
   else if(f.workload===3){ why.push(`'Too much' workload → set count held (R5).`); }
   else{
     const strongAdd=(f.workload===0)||(f.soreness===0 && f.pump===0);
-    const adds=strongAdd?2:1;
+    const adds=strongAdd?RULES.strongSetAdd:RULES.setAdd;
     const lastW=sets[sets.length-1].w;
     for(let a=0;a<adds;a++) sets.push({w:lastW,tgt:null,rir,st:null,reps:null});
     why.push(`+${adds} set at <b>${lastW}</b> to <b>${rir} RIR</b> (R2${strongAdd?'+R5/R8: under-stimulated signal':''}).`);
   }
   return {sets,why:why.join(' ')};
 }
+/* ============================ @engine:end ============================== */
 
 /* ============================================================ UI ============ */
 let ST=null, view='workout', selWeek=2, selDay=3;
@@ -458,7 +478,7 @@ function renderHeader(){
   const M=ST.meso;
   const titles={workout:`WEEK ${selWeek} <span class="dim">DAY ${selDay}</span>`,library:'LIBRARY',
     builder:'MESO BUILDER',engine:'THE ENGINE',data:'DATA'};
-  const subs={workout:`${DAYS[selDay-1]} · ${M.name} · target ${selWeek>5?DELOAD_RIR:RIR_RAMP[selWeek-1]} RIR`,
+  const subs={workout:`${DAYS[selDay-1]} · ${M.name} · target ${rirFor(selWeek)} RIR`,
     library:`${CATALOG.length} performed exercises · tap for history`,
     builder: ST.draft?`Draft: ${ST.draft.name}`:'Plan your next mesocycle',
     engine:'Every number, explained. No black box.',data:'Export, reset, storage'};
@@ -467,10 +487,11 @@ function renderHeader(){
 function renderSpine(){
   const el=$('spine');
   if(view!=='workout'){ el.innerHTML=''; return; }
-  el.innerHTML=Array.from({length:6},(_,i)=>{
-    const w=i+1, rir=w>5?'DL · 8 RIR':RIR_RAMP[i]+' RIR';
+  const dl=RIR_RAMP.length+1;
+  el.innerHTML=Array.from({length:dl},(_,i)=>{
+    const w=i+1, rir=w===dl?`DL · ${DELOAD_RIR} RIR`:RIR_RAMP[i]+' RIR';
     const cls=w===selWeek?'active':(w<ST.meso.curWeek?'done':'');
-    return `<button class="wk ${cls}" onclick="pickWeek(${w})"><div class="n">${w>5?'DL':w}</div><div class="r">${rir}</div></button>`;
+    return `<button class="wk ${cls}" onclick="pickWeek(${w})"><div class="n">${w===dl?'DL':w}</div><div class="r">${rir}</div></button>`;
   }).join('');
 }
 function renderTabs(){
@@ -549,7 +570,7 @@ async function cycleLog(ei,si){
 async function addSet(ei){
   const sets=ST.meso.log[key(selWeek,selDay)][ei];
   const lastW=sets.length?sets[sets.length-1].w:null;
-  sets.push({w:lastW,tgt:null,rir:selWeek>5?DELOAD_RIR:RIR_RAMP[selWeek-1],st:null,reps:null});
+  sets.push({w:lastW,tgt:null,rir:rirFor(selWeek),st:null,reps:null});
   await save(); render();
 }
 
@@ -741,22 +762,22 @@ function renderEngine(){
   <div class="eng-block"><h3>R1 · Rep progression</h3>
     <p>Same weight, last week's reps <code>+1</code> per matched set. Verified vs RP exactly.</p></div>
   <div class="eng-block"><h3>R2 · Set addition</h3>
-    <p>+1 set/exercise/week by default; new sets get weight only, worked to the week's RIR. Gated by R4/R5/R8.</p></div>
+    <p>+${RULES.setAdd} set/exercise/week by default; new sets get weight only, worked to the week's RIR. Gated by R4/R5/R8.</p></div>
   <div class="eng-block"><h3>R3 · Load autoregulation</h3>
-    <p>Later sets at <code>≤4 reps</code> or <code>≥3</code> below set 1 → <code>~8%</code> load cut, RIR reset. Verified: 60×4 → RP prescribed 55. Exact match.</p></div>
+    <p>Later sets at <code>≤${RULES.floorReps} reps</code> or <code>≥${RULES.dropFromFirst}</code> below set 1 → <code>~${pct(RULES.cutPct)}%</code> load cut, RIR reset. Verified: 60×4 → RP prescribed 55. Exact match.</p></div>
   <div class="eng-block"><h3>R4 · Pain gate</h3>
     <p>Moderate+ joint pain → rep targets held, no set added.</p></div>
   <div class="eng-block"><h3>R5 · Workload feedback</h3>
-    <p><code>Too much</code> → hold set count. <code>Not enough</code> → +2 sets.</p></div>
+    <p><code>Too much</code> → hold set count. <code>Not enough</code> → +${RULES.strongSetAdd} sets.</p></div>
   <div class="eng-block"><h3>R6 · Missing data</h3>
     <p>All sets skipped → same weights re-prescribed, RIR target only. Matches RP.</p></div>
   <div class="eng-block"><h3>R7 · Deload</h3>
-    <p>Week 6: half the sets at 8 RIR.</p></div>
+    <p>Week ${RIR_RAMP.length+1}: half the sets at ${DELOAD_RIR} RIR.</p></div>
   <div class="eng-block"><h3>R8 · Soreness (recovery gate)</h3>
-    <p>Asked per muscle: still sore → volume held. Never sore + low pump → strongest add signal (+2 sets).
+    <p>Asked per muscle: still sore → volume held. Never sore + low pump → strongest add signal (+${RULES.strongSetAdd} sets).
     'Healed just on time' is the optimum — standard progression.</p></div>
   <div class="eng-block"><h3>Cross-meso seeding</h3>
-    <p>Exercises own their history. Returning after <code>>8 wks</code> → last load −10%; sooner → last load as-is; week 1 always works to RIR.</p></div>`;
+    <p>Exercises own their history. Returning after <code>>${RULES.staleWeeks} wks</code> → last load −${pct(RULES.staleDiscount)}%; sooner → last load as-is; week 1 always works to RIR.</p></div>`;
 }
 
 /* ---------- data ---------- */

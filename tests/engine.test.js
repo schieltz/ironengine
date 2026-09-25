@@ -34,8 +34,7 @@ describe('script integrity', () => {
   });
 
   test('engine block is pure: no DOM, storage, or app-state references', () => {
-    const { block } = engineSource();
-    const code = block.replace(/\/\*[\s\S]*?\*\//g, '');
+    const code = engineSource().replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
     for (const ident of ['document', 'window', 'localStorage', 'store', 'ST', 'render', 'save']) {
       assert.doesNotMatch(code, new RegExp(`\\b${ident}\\b`), `engine references ${ident}`);
     }
