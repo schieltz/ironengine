@@ -13,7 +13,8 @@ Live: https://schieltz.github.io/ironengine/
 ## Data model
 - Saved state `{v, meso, hist, draft}` under key `state2`. `v` = schema version; unversioned saves are v1. Changing the stored shape = bump `SCHEMA_VERSION`, append a step to `MIGRATIONS`, update `seedState()`, add a migration test. `migrate()` runs on load; upgraded state is saved immediately.
 - `ST.meso`: {name, weeks, curWeek, curDay, days[3][exercises], log{wNdM: [exercise][sets]}}
-- set: {w, reps, tgt, rir, st: 'logged'|'skipped'|null}
+- set: {w, reps, tgt, rir, st: 'logged'|'skipped'|null, u?: 1}. `u` = user-touched (edited, tapped, or manually added).
+- Prescriptions are provisional: `planDay()` recomputes every exercise in a session from the prior week on each visit until any of its sets is touched (`st` or `u`); touched exercises are never recomputed. It fills missing prior weeks recursively, so looking ahead never freezes stale numbers or produces 0 lb sets. When the prior week is unlogged, the "why" says it's a preview.
 - `ST.hist`: exercise name → {w: last top-set weight, date} — cross-meso, permanent
 - `ST.draft`: meso under construction in Builder
 - `CATALOG`: 98 exercises (owner's performed list from RP), each {name, mg, equip, last, home}

@@ -190,3 +190,54 @@ describe('storage failures never overwrite saved data', () => {
     assert.match(app.els.get('banner').innerHTML, /nothing is being saved/);
   });
 });
+
+/* log every set of exercise i in session k at the given reps */
+const logReps = (app, k, i, reps) =>
+  app.call(`ST.meso.log.${k}[${i}].forEach((s,j)=>{ s.reps=${JSON.stringify(reps)}[j]; s.st='logged'; }); await save();`);
+
+describe('provisional prescriptions (looking ahead never freezes numbers)', () => {
+  test('week 3 viewed early still updates once week 2 is logged', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('await pickWeek(3);');
+    assert.deepEqual(app.state().meso.log.w3d3[3], [rirOnly(120, 2), rirOnly(120, 2), rirOnly(120, 2)]);
+    assert.match(app.state().meso.days[2][3]._why.w3d3, /Preview/);
+
+    await app.call('await pickWeek(2);');
+    await logReps(app, 'w2d3', 3, [11, 10, 9]);
+    await app.call('await pickWeek(3);');
+    const st = app.state();
+    assert.deepEqual(st.meso.log.w3d3[3], [target(120, 12), target(120, 11), target(120, 10), rirOnly(120, 2)]);
+    assert.match(st.meso.days[2][3]._why.w3d3, /R1/);
+  });
+
+  test('tapping the deload week from week 2 never produces 0 lb sets', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('await pickWeek(6);');
+    const w6 = app.state().meso.log.w6d3.flat();
+    assert.ok(w6.length > 0);
+    assert.ok(w6.every(s => s.w > 0), JSON.stringify(w6.map(s => s.w)));
+  });
+
+  test('a touched exercise stays frozen while untouched ones keep updating', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('await pickWeek(3); await upd(3,0,"w","125");');   // edit bench weight in week 3
+    const frozen = app.state().meso.log.w3d3[3];
+    await app.call('await pickWeek(2);');
+    await logReps(app, 'w2d3', 3, [11, 10, 9]);
+    await logReps(app, 'w2d3', 5, [8, 8]);                             // barbell row, untouched in week 3
+    await app.call('await pickWeek(3);');
+    const st = app.state();
+    assert.deepEqual(st.meso.log.w3d3[3], frozen);
+    assert.equal(st.meso.log.w3d3[3][0].w, 125);
+    assert.deepEqual(st.meso.log.w3d3[5].slice(0, 2), [target(120, 9), target(120, 9)]);
+  });
+
+  test('navigating without changes does not rewrite storage', async () => {
+    const ls = fakeLocalStorage();
+    const app = await bootApp({ now: NOW, localStorage: ls });
+    await app.call('await pickWeek(3); await pickWeek(2);');
+    const writes = ls.calls.filter(c => c[0] === 'setItem' && c[1] === 'ironengine:state2').length;
+    await app.call('await pickWeek(3); await pickWeek(2);');
+    assert.equal(ls.calls.filter(c => c[0] === 'setItem' && c[1] === 'ironengine:state2').length, writes);
+  });
+});

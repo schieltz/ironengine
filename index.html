@@ -541,20 +541,32 @@ async function startFresh(){
 }
 function key(w,d){ return `w${w}d${d}`; }
 
-async function ensureDay(w,d){
-  const M=ST.meso, k=key(w,d);
-  if(M.log[k] && M.log[k].every(s=>s!==null)) return;
-  const prev=M.log[key(w-1,d)], exs=M.days[d-1];
-  if(!M.log[k]) M.log[k]=exs.map(()=>null);
+/* Prescriptions stay provisional until you touch an exercise (log, skip, edit, or add a set).
+   Every visit recomputes untouched exercises from the prior week, so looking ahead never freezes
+   stale numbers. Touched exercises are yours and are never recomputed. */
+const touched=sets=>!!sets&&sets.some(s=>s.st||s.u);
+async function ensureDay(w,d){ if(planDay(w,d)) await save(); }
+function planDay(w,d){ /* returns true when anything changed */
+  const M=ST.meso, k=key(w,d), exs=M.days[d-1];
+  let changed=!M.log[k];
+  const log=M.log[k]||(M.log[k]=exs.map(()=>null));
+  if(exs.every((_,i)=>touched(log[i]))) return changed;
+  if(w>1 && planDay(w-1,d)) changed=true;
+  const prev=M.log[key(w-1,d)];
   exs.forEach((ex,i)=>{
-    if(M.log[k][i]) return;
+    if(touched(log[i])) return;
     let p;
-    if(w===1 && !prev) p=startingSets(ex.name,ST.hist,RIR_RAMP[0],ex.pri===0?1:2);
-    else p=prescribe(ex, prev?prev[i]:null, w, ex.feedback);
-    M.log[k][i]=p.sets;
-    ex._why=ex._why||{}; ex._why[k]=p.why;
+    if(w===1) p=startingSets(ex.name,ST.hist,rirFor(1),ex.pri===0?1:2);
+    else{
+      p=prescribe(ex,prev[i],w,ex.feedback);
+      if(!prev[i].some(s=>s.st)) p.why=`Preview: ${DAYS[d-1]} week ${w-1} isn't logged yet, so this repeats its weights `
+        +`at <b>${rirFor(w)} RIR</b>. Updates automatically once you log it.`;
+    }
+    ex._why=ex._why||{};
+    if(JSON.stringify([log[i],ex._why[k]])!==JSON.stringify([p.sets,p.why])) changed=true;
+    log[i]=p.sets; ex._why[k]=p.why;
   });
-  await save();
+  return changed;
 }
 
 function render(){
@@ -642,11 +654,13 @@ function setRow(ei,si,s){
   </div>`;
 }
 async function upd(ei,si,f,v){
-  ST.meso.log[key(selWeek,selDay)][ei][si][f]=v===''?null:parseFloat(v);
+  const s=ST.meso.log[key(selWeek,selDay)][ei][si];
+  s[f]=v===''?null:parseFloat(v); s.u=1;   /* u: user-touched, freezes this exercise's prescription */
   await save();
 }
 async function cycleLog(ei,si){
   const s=ST.meso.log[key(selWeek,selDay)][ei][si];
+  s.u=1;
   if(!s.st){
     if(s.reps==null && s.tgt==null && s._skipArm){ delete s._skipArm; s.st='skipped'; await save(); render(); return; }
     if(s.reps==null && s.tgt!=null) s.reps=s.tgt;
@@ -659,7 +673,7 @@ async function cycleLog(ei,si){
 async function addSet(ei){
   const sets=ST.meso.log[key(selWeek,selDay)][ei];
   const lastW=sets.length?sets[sets.length-1].w:null;
-  sets.push({w:lastW,tgt:null,rir:rirFor(selWeek),st:null,reps:null});
+  sets.push({w:lastW,tgt:null,rir:rirFor(selWeek),st:null,reps:null,u:1});
   await save(); render();
 }
 
