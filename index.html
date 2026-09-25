@@ -158,6 +158,7 @@ nav button.active{color:var(--blue)}
   <button id="navD" onclick="setView('data')"><span class="ic">⬒</span>Data</button>
 </nav>
 <div id="modalRoot"></div>
+<input type="file" id="importInput" accept=".json,application/json" hidden onchange="importFile(this)">
 <div class="toast" id="toast"></div>
 
 <script>
@@ -379,14 +380,14 @@ function seedState(){
     'Romanian Deadlift':{w:175,date:'2026-07-06'},'Bench Press (Medium Grip)':{w:175,date:'2026-07-06'},
     'Barbell Bent Over Row':{w:120,date:'2026-07-04'},
   };
-  return {v:SCHEMA_VERSION,meso,hist,draft:null};
+  return {v:SCHEMA_VERSION,meso,hist,draft:null,archive:[]};
 }
 
 /* ---------- state schema ----------
    Saved state carries v; unversioned saves are v1. To change the stored shape:
    bump SCHEMA_VERSION, append the upgrade step to MIGRATIONS, update seedState(),
    and add a migration test. */
-const SCHEMA_VERSION=2;
+const SCHEMA_VERSION=3;
 const MIGRATIONS=[   /* MIGRATIONS[n-1] upgrades a v(n) state to v(n+1), in place */
   /* v1→v2: feedback moves off the exercise (where it applied to every later week) into
      meso.fb[session][exercise]. A legacy answer is attributed to the latest week of that
@@ -406,6 +407,8 @@ const MIGRATIONS=[   /* MIGRATIONS[n-1] upgrades a v(n) state to v(n+1), in plac
     }));
     if(s.draft) s.draft.days.forEach(day=>day.forEach(ex=>delete ex.feedback));
   },
+  /* v2→v3: finished mesos are archived whole instead of discarded */
+  s=>{ s.archive=s.archive||[]; },
 ];
 function migrate(s){
   let v=s.v||1;
@@ -539,6 +542,7 @@ function renderLoadError(){
     <div class="sheet-stack">
       <button class="btn-primary" onclick="location.reload()">Retry</button>
       ${e.raw?`<button class="btn-ghost" onclick="copyRaw()">Copy raw saved data</button>`:''}
+      <button class="btn-ghost" onclick="$('importInput').click()">Restore from backup file</button>
       <button class="btn-ghost" style="color:var(--red)" onclick="startFresh()">Start fresh</button>
     </div></div></div>`;
 }
@@ -795,7 +799,7 @@ function renderBuilder(){
         <span class="swap">Swap ›</span></button>`;
     }).join('')}
     <button class="bigbtn" onclick="activateDraft()">Activate meso — archive current</button>
-    <button class="bigbtn ghost" onclick="ST.draft=null;save();render()">Discard draft</button>`;
+    <button class="bigbtn ghost" onclick="discardDraft()">Discard draft</button>`;
 }
 async function makeDraft(){
   const M=ST.meso;
@@ -856,7 +860,12 @@ async function doSwap(name){
   Object.assign(slot,{name:c.name,mg:c.mg,equip:c.equip,_swapped:true,_auto:false,note:null});
   closeSwap(); await save(); render(); toast(`Swapped in ${name}`);
 }
+async function discardDraft(){
+  if(!confirm('Discard this draft? The current meso is not affected.')) return;
+  ST.draft=null; await save(); render();
+}
 async function activateDraft(){
+  if(!confirm(`Start "${ST.draft.name.replace(' (draft)','')}" now?\n\nThe current meso moves to the archive (all its sets are kept) and its top sets update your exercise history.`)) return;
   /* harvest history from current meso before archiving */
   const M=ST.meso;
   Object.keys(M.log).forEach(k=>{
@@ -871,6 +880,7 @@ async function activateDraft(){
       if(!cur||top>=cur.w) ST.hist[ex.name]={w:top,date:new Date().toISOString().slice(0,10)};
     });
   });
+  ST.archive.push({...M,archivedAt:new Date().toISOString().slice(0,10)});
   const D=ST.draft;
   ST.meso={name:D.name.replace(' (draft)','')+' · '+new Date().toISOString().slice(0,10),weeks:D.weeks,curWeek:1,curDay:1,
     days:D.days.map(day=>day.map(ex=>({name:ex.name,mg:ex.mg,equip:ex.equip,note:ex.note,pri:ex.pri??1}))),log:{},fb:{}};
@@ -906,20 +916,55 @@ function renderEngine(){
 /* ---------- data ---------- */
 function renderData(){
   $('main').innerHTML=`
-  <div class="eng-block"><h3>Export</h3><p>Full state (meso + history + draft) as JSON.</p>
-    <div class="card-actions"><button onclick="doExport()">Copy JSON</button></div></div>
+  <div class="eng-block"><h3>Backup</h3><p>Everything (current meso, history, ${ST.archive.length} archived
+    meso${ST.archive.length===1?'':'s'}, draft) in one file. Save it to Files or iCloud. Restoring replaces all current data.</p>
+    <div class="card-actions"><button onclick="saveBackup()">Save backup file</button><button onclick="doExport()">Copy JSON</button></div>
+    <div class="card-actions"><button onclick="$('importInput').click()">Restore from backup file</button></div></div>
   <div class="eng-block"><h3>Storage</h3><p>${{
     claude:'Saved in Claude artifact storage.',
     local:'Saved in this browser only. On iPhone, the home-screen app and Safari keep separate copies: always use the same one. Back up regularly.',
     memory:'<b style="color:var(--red)">Not being saved.</b> This browser blocks storage; everything is lost when the app closes. Export now.'}[store.mode]}</p></div>
-  <div class="eng-block"><h3>Reset</h3><p>Restores the RP-screenshot seed. Destroys changes.</p>
+  <div class="eng-block"><h3>Reset</h3><p>Erases everything, including history and the archive, and restores the RP-screenshot seed.</p>
     <div class="card-actions"><button onclick="doReset()" style="color:var(--red)">Reset to seed</button></div></div>`;
 }
+const backupJSON=()=>JSON.stringify(ST,null,1);
+async function saveBackup(){
+  const name=`ironengine-backup-${new Date().toISOString().slice(0,10)}.json`;
+  const file=new File([backupJSON()],name,{type:'application/json'});
+  try{ /* iPhone: share sheet → Save to Files / iCloud / AirDrop */
+    if(navigator.canShare&&navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:name}); return; }
+  }catch(e){ if(e.name==='AbortError') return; }
+  const a=document.createElement('a'); a.href=URL.createObjectURL(file); a.download=name;
+  document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
 async function doExport(){
-  try{ await navigator.clipboard.writeText(JSON.stringify(ST,null,1)); toast('Copied'); }
-  catch(e){ toast('Clipboard blocked — see console'); console.log(JSON.stringify(ST)); }
+  try{ await navigator.clipboard.writeText(backupJSON()); toast('Copied'); }
+  catch(e){ toast('Clipboard blocked — see console'); console.log(backupJSON()); }
+}
+function parseBackup(text){
+  let s;
+  try{ s=JSON.parse(text); }catch(e){ return {ok:false,error:'Not a valid backup file'}; }
+  if(!s||typeof s!=='object'||!s.meso||!Array.isArray(s.meso.days)||!s.meso.log||typeof s.hist!=='object')
+    return {ok:false,error:'Not an IRON ENGINE backup'};
+  try{ migrate(s); }catch(e){ return {ok:false,error:e.message}; }
+  return {ok:true,state:s};
+}
+async function importText(text){
+  const r=parseBackup(text);
+  if(!r.ok){ toast(r.error); return false; }
+  const s=r.state;
+  if(!confirm(`Replace ALL current data with this backup?\n\n${s.meso.name} · ${Object.keys(s.hist).length} exercises in history · ${s.archive.length} archived`)) return false;
+  if(loadError && !await overwriteUnreadable()) return false;
+  ST=s; selWeek=ST.meso.curWeek; selDay=ST.meso.curDay;
+  await ensureDay(selWeek,selDay); await save(); view='workout'; render(); toast('Backup restored');
+  return true;
+}
+async function importFile(input){
+  const f=input.files&&input.files[0]; input.value='';
+  if(f) await importText(await f.text());
 }
 async function doReset(){
+  if(!confirm('Erase EVERYTHING (current meso, history, archive) and restore the demo seed?\n\nSave a backup first. This cannot be undone.')) return;
   ST=seedState(); selWeek=ST.meso.curWeek; selDay=ST.meso.curDay;
   await ensureDay(selWeek,selDay); await save(); view='workout'; render(); toast('Reset');
 }

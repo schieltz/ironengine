@@ -11,13 +11,14 @@ Live: https://schieltz.github.io/ironengine/
 3. **UI**: five views (Workout / Library / Builder / Engine / Data), string-template rendering, no framework.
 
 ## Data model
-- Saved state `{v, meso, hist, draft}` under key `state2`. `v` = schema version; unversioned saves are v1. Changing the stored shape = bump `SCHEMA_VERSION`, append a step to `MIGRATIONS`, update `seedState()`, add a migration test. `migrate()` runs on load; upgraded state is saved immediately.
+- Saved state `{v, meso, hist, draft, archive}` under key `state2`. `v` = schema version; unversioned saves are v1. Changing the stored shape = bump `SCHEMA_VERSION`, append a step to `MIGRATIONS`, update `seedState()`, add a migration test. `migrate()` runs on load; upgraded state is saved immediately.
 - `ST.meso`: {name, weeks, curWeek, curDay, days[3][exercises], log{wNdM: [exercise][sets]}, fb{wNdM: [exercise] → {soreness, pain, pump, workload}}}
 - Feedback belongs to the session it was given in (`fb[wNdM][i]`) and shapes only the next week's prescription for that exercise on that day (v2; v1 stored one answer per exercise that applied to every later week).
 - set: {w, reps, tgt, rir, st: 'logged'|'skipped'|null, u?: 1}. `u` = user-touched (edited, tapped, or manually added).
 - Prescriptions are provisional: `planDay()` recomputes every exercise in a session from the prior week on each visit until any of its sets is touched (`st` or `u`); touched exercises are never recomputed. It fills missing prior weeks recursively, so looking ahead never freezes stale numbers or produces 0 lb sets. When the prior week is unlogged, the "why" says it's a preview.
 - `ST.hist`: exercise name → {w: last top-set weight, date} — cross-meso, permanent
 - `ST.draft`: meso under construction in Builder
+- `ST.archive`: finished mesos, kept whole (every set) with `archivedAt` when a draft is activated (v3). No browsing UI yet; included in backups.
 - `CATALOG`: 98 exercises (owner's performed list from RP), each {name, mg, equip, last, home}
 - `TEMPLATES`: 6 RP meso blueprints; slots [MG, priority, optionalPinnedExercise]
 
@@ -40,9 +41,9 @@ RIR ramp: 3/2/2/1/0 + deload 8. Days: Mon/Wed/Fri.
 - R2/R5/R8 coefficients unvalidated — owner is parallel-logging in RP for one meso to calibrate; expect tuning PRs
 - No rep-range targets per exercise type (RP likely varies floor by compound/isolation)
 - History stores top set only; consider full set-level history + e1RM trend
-- No multi-meso archive browsing UI (data preserved in hist only)
+- No multi-meso archive browsing UI (full mesos are kept in `ST.archive` and in backups)
 - Casey Kelly template: 4 pinned exercises substituted with home equivalents (owner-approved to revisit)
-- Export = clipboard JSON; consider file download + import
+- Backup = file (iOS share sheet → Files/iCloud; download elsewhere) or clipboard JSON; restore from file on the Data tab or the load-error sheet. Reset, Activate, Discard, Restore and Start fresh all confirm first
 - No service worker yet (offline works via browser cache once loaded; make explicit)
 
 ## Testing protocol (established, keep it)

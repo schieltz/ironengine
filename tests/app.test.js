@@ -287,10 +287,93 @@ describe('feedback belongs to one session (C2)', () => {
     legacy.meso.log.w3d1 = legacy.meso.log.w2d1.map(sets => sets.map(s => ({ ...s, st: null })));
     ls.data.set('ironengine:state2', JSON.stringify(legacy));
 
-    const st = (await bootApp({ now: NOW, localStorage: ls })).state();
-    assert.equal(st.v, 2);
+    const app = await bootApp({ now: NOW, localStorage: ls });
+    const st = app.state();
+    assert.equal(st.v, app.run('SCHEMA_VERSION'));
     assert.deepEqual(st.meso.fb.w2d2[2], pain);
     assert.deepEqual(st.meso.fb.w2d1[0], NEUTRAL);                   // week 3 Mon untouched, so week 2
     assert.ok(st.meso.days.flat().every(ex => !('feedback' in ex)));
+  });
+});
+
+describe('destructive actions and backups (C3)', () => {
+  test('Reset asks first; declining keeps everything', async () => {
+    let answer = false;
+    const app = await bootApp({ now: NOW, confirm: () => answer });
+    await app.call('ST.meso.name="mine"; ST.hist.X={w:1,date:"2026-09-01"}; await doReset();');
+    assert.equal(app.state().meso.name, 'mine');
+    answer = true;
+    await app.call('await doReset();');
+    assert.equal(app.state().meso.name, 'New meso plan');
+    assert.equal(app.state().hist.X, undefined);
+  });
+
+  test('Activate asks first, then archives the old meso with every set', async () => {
+    let answer = false;
+    const app = await bootApp({ now: NOW, confirm: () => answer });
+    await app.call('await makeDraft(); await activateDraft();');
+    assert.equal(app.state().meso.name, 'New meso plan');
+    assert.ok(app.state().draft);
+
+    const oldMeso = app.state().meso;
+    answer = true;
+    await app.call('await activateDraft();');
+    const st = app.state();
+    assert.equal(st.archive.length, 1);
+    assert.deepEqual(st.archive[0].log, oldMeso.log);
+    assert.equal(st.archive[0].archivedAt, '2026-09-25');
+    assert.equal(st.meso.curWeek, 1);
+    assert.equal(st.draft, null);
+  });
+
+  test('Discard draft asks first', async () => {
+    let answer = false;
+    const app = await bootApp({ now: NOW, confirm: () => answer });
+    await app.call('await makeDraft(); await discardDraft();');
+    assert.ok(app.state().draft);
+    answer = true;
+    await app.call('await discardDraft();');
+    assert.equal(app.state().draft, null);
+  });
+
+  test('backup file round-trips into a fresh install', async () => {
+    const src = await bootApp({ now: NOW });
+    await src.call('ST.meso.name="backed up"; ST.hist.Y={w:50,date:"2026-09-02"};');
+    const json = src.run('backupJSON()');
+    const dst = await bootApp({ now: NOW, confirm: () => true });
+    await dst.call(`await importText(${JSON.stringify(json)});`);
+    assert.deepEqual(dst.state(), src.state());
+  });
+
+  test('import rejects junk and newer versions without touching data', async () => {
+    const app = await bootApp({ now: NOW, confirm: () => true });
+    const before = app.state();
+    for (const text of ['not json', '{"hello":1}', JSON.stringify({ ...before, v: 99 })]) {
+      await app.call(`await importText(${JSON.stringify(text)});`);
+      assert.deepEqual(app.state(), before);
+    }
+  });
+
+  test('import accepts an old unversioned clipboard export and migrates it', async () => {
+    const legacy = (await bootApp({ now: NOW })).state();
+    delete legacy.v; delete legacy.archive; delete legacy.meso.fb;
+    legacy.meso.name = 'old export';
+    const app = await bootApp({ now: NOW, confirm: () => true });
+    await app.call(`await importText(${JSON.stringify(JSON.stringify(legacy))});`);
+    const st = app.state();
+    assert.equal(st.meso.name, 'old export');
+    assert.equal(st.v, app.run('SCHEMA_VERSION'));
+    assert.deepEqual(st.archive, []);
+  });
+
+  test('restoring a backup clears a load error and keeps the unreadable data', async () => {
+    const backup = (await bootApp({ now: NOW })).run('backupJSON()');
+    const ls = fakeLocalStorage();
+    ls.data.set('ironengine:state2', '{broken');
+    const app = await bootApp({ now: NOW, localStorage: ls, confirm: () => true });
+    await app.call(`await importText(${JSON.stringify(backup)});`);
+    assert.equal(JSON.parse(ls.data.get('ironengine:state2')).meso.name, 'New meso plan');
+    assert.ok([...ls.data.values()].includes('{broken'));
+    assert.equal(app.run('loadError'), null);
   });
 });
