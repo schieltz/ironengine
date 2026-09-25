@@ -91,3 +91,23 @@ describe('Engine tab', () => {
     assert.doesNotMatch(html, /\$\{/, 'unrendered template');
   });
 });
+
+describe('state schema', () => {
+  test('fresh seed is stamped with the current schema version', async () => {
+    const app = await bootApp({ now: NOW });
+    assert.equal(app.state().v, app.run('SCHEMA_VERSION'));
+  });
+
+  test('unversioned (legacy) save loads intact and is re-saved with a version', async () => {
+    const ls = fakeLocalStorage();
+    const seed = await bootApp({ now: NOW });
+    const legacy = seed.state();
+    delete legacy.v;
+    legacy.meso.name = 'legacy meso';
+    ls.data.set('ironengine:state2', JSON.stringify(legacy));
+
+    const app = await bootApp({ now: NOW, localStorage: ls });
+    assert.equal(app.state().meso.name, 'legacy meso');
+    assert.equal(JSON.parse(ls.data.get('ironengine:state2')).v, app.run('SCHEMA_VERSION'));
+  });
+});

@@ -354,7 +354,21 @@ function seedState(){
     'Romanian Deadlift':{w:175,date:'2026-07-06'},'Bench Press (Medium Grip)':{w:175,date:'2026-07-06'},
     'Barbell Bent Over Row':{w:120,date:'2026-07-04'},
   };
-  return {meso,hist,draft:null};
+  return {v:SCHEMA_VERSION,meso,hist,draft:null};
+}
+
+/* ---------- state schema ----------
+   Saved state carries v; unversioned saves are v1. To change the stored shape:
+   bump SCHEMA_VERSION, append the upgrade step to MIGRATIONS, update seedState(),
+   and add a migration test. */
+const SCHEMA_VERSION=1;
+const MIGRATIONS=[];   /* MIGRATIONS[n-1] upgrades a v(n) state to v(n+1), in place */
+function migrate(s){
+  let v=s.v||1;
+  if(v>SCHEMA_VERSION) throw new Error(`Saved data is from a newer app version (v${v}). Reload to update the app.`);
+  while(v<SCHEMA_VERSION){ MIGRATIONS[v-1](s); v++; }
+  s.v=SCHEMA_VERSION;
+  return s;
 }
 
 /* ============================ @engine:begin ============================
@@ -445,9 +459,13 @@ function toast(t){ const el=$('toast'); el.textContent=t; el.classList.add('show
 const esc=s=>s.replace(/'/g,"\\'");
 
 async function init(){
-  ST=await store.get('state2') || seedState();
+  const saved=await store.get('state2');
+  const upgrading=saved&&saved.v!==SCHEMA_VERSION;
+  ST=saved?migrate(saved):seedState();
   selWeek=ST.meso.curWeek; selDay=ST.meso.curDay;
-  await ensureDay(selWeek,selDay); render();
+  await ensureDay(selWeek,selDay);
+  if(upgrading) await save();
+  render();
 }
 async function save(){ await store.set('state2',ST); }
 function key(w,d){ return `w${w}d${d}`; }

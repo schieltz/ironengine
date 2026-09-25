@@ -11,6 +11,7 @@ Live: https://schieltz.github.io/ironengine/
 3. **UI**: five views (Workout / Library / Builder / Engine / Data), string-template rendering, no framework.
 
 ## Data model
+- Saved state `{v, meso, hist, draft}` under key `state2`. `v` = schema version; unversioned saves are v1. Changing the stored shape = bump `SCHEMA_VERSION`, append a step to `MIGRATIONS`, update `seedState()`, add a migration test. `migrate()` runs on load; upgraded state is saved immediately.
 - `ST.meso`: {name, weeks, curWeek, curDay, days[3][exercises], log{wNdM: [exercise][sets]}}
 - set: {w, reps, tgt, rir, st: 'logged'|'skipped'|null}
 - `ST.hist`: exercise name → {w: last top-set weight, date} — cross-meso, permanent
