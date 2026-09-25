@@ -1,0 +1,11 @@
+{
+  "name": "ironengine",
+  "private": true,
+  "description": "IRON ENGINE test harness. The app itself is index.html; nothing here ships.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test --test-reporter=spec \"tests/**/*.test.js\""
+  }
+}
