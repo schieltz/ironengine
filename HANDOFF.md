@@ -1,7 +1,9 @@
 # IRON ENGINE — Engineering Handoff
 
 ## What this is
-Single-file PWA (`index.html`, ~1,100 lines, vanilla JS, zero dependencies) replicating the RP Hypertrophy app's autoregulated training algorithm, reverse-engineered from the owner's actual RP data. Runs as a Claude artifact (window.storage) or self-hosted on GitHub Pages/Netlify (localStorage fallback, auto-detected). Deployed via "Add to Home Screen" on iPhone.
+Single-file PWA (`index.html`, ~780 lines, vanilla JS, zero dependencies) replicating the RP Hypertrophy app's autoregulated training algorithm, reverse-engineered from the owner's actual RP data. Runs as a Claude artifact (window.storage) or self-hosted on GitHub Pages (localStorage fallback, auto-detected). Deployed via "Add to Home Screen" on iPhone.
+
+Live: https://schieltz.github.io/ironengine/
 
 ## Architecture (single file, three layers)
 1. **Storage adapter** (`store`, top of script): window.storage → localStorage (`ironengine:` prefix) → in-memory. Swap here for any new backend.
@@ -21,7 +23,7 @@ Single-file PWA (`index.html`, ~1,100 lines, vanilla JS, zero dependencies) repl
 |------|----------|------------|
 | R1 | Same weight, prior week reps +1 per set | VERIFIED vs RP exactly |
 | R2 | +1 set/exercise/week; new sets get weight + RIR target only | Inferred, mechanism confirmed |
-| R3 | Later sets ≤4 reps or ≥3 below set 1 → ~8% load cut, RIR reset | VERIFIED (60×4 → 55 exact match) |
+| R3 | Later sets ≤4 reps or ≥3 below set 1 → ~8% load cut, RIR reset | VERIFIED (60×4 → 55 exact match). The 8% is inferred: 60→55 fits any 4.2-12.5% cut. Set count after the cut (2 vs 3) unconfirmed |
 | R4 | Joint pain ≥ moderate → hold reps, no set add | Inferred |
 | R5 | Workload 'too much' → hold sets; 'not enough' → +2 | Inferred |
 | R6 | All sets skipped → re-prescribe same weights, RIR only | VERIFIED |
@@ -41,7 +43,16 @@ RIR ramp: 3/2/2/1/0 + deload 8. Days: Mon/Wed/Fri.
 - No service worker yet (offline works via browser cache once loaded; make explicit)
 
 ## Testing protocol (established, keep it)
-Every engine change: headless node test extracting the engine block, asserting the three VERIFIED fixtures still reproduce RP's exact prescriptions (bench 120×10/9 → 120×11/10/+2RIR; DB incline 60×5/4 → 60×6, 55@2RIR; skipped → same weights @ RIR), plus new-rule cases. Parse-check full script before shipping.
+Run `npm test` (Node 20+, zero dependencies). Every engine change must pass it before commit.
+
+- `tests/harness.js`: extracts the engine block (PROGRESSION ENGINE banner → UI banner, plus the `RIR_RAMP` constants line) and runs it in a node `vm` sandbox with a frozen clock. Can also boot the whole inline script against a DOM stub. `IRONENGINE_HTML=path` points it at another copy (used for mutation checks).
+- `tests/engine.test.js`: parse check of the full script; single-file and engine-purity guards; the three VERIFIED fixtures (bench 120×10/9 → 120×11/10/+120@2RIR; DB incline 60×5/4 → 60×6, 55@2RIR; skipped → same weights @ RIR); R3 thresholds and the 8% coefficient; R4, R5, R7, R8; cross-meso seeding (recent, 8-week boundary, stale −10%, no history, maintenance); a "why" on every prescription.
+- `tests/app.test.js`: VERIFIED fixtures again through the real `ensureDay()` path on the seed (w1d3 → w2d3); storage adapter guard (window.storage present → localStorage never touched; absent → `ironengine:` prefix, reload restores).
+- Open `todo` test: DB incline set count. HANDOFF lists 2 sets; engine emits 3 (R2 adds a set after the R3 cut). Resolve with the RP screenshot, then make it a hard assertion.
+- New RP-verified behavior from calibration becomes a permanent fixture in the VERIFIED block.
+
+## Deployment
+GitHub Pages from `main`, repo root (`.nojekyll`, no build). Repo: https://github.com/schieltz/ironengine. Flow: `npm test` green → commit (conventional, one logical change) → `git push`. Pages rebuilds in about a minute. Note: `tests/`, `package.json` and this file are also publicly served; harmless.
 
 ## Hard constraints
 - Single self-contained HTML file. No build step, no CDN dependencies, no framework.
