@@ -26,16 +26,25 @@ Live: https://schieltz.github.io/ironengine/
 | Rule | Behavior | Validation |
 |------|----------|------------|
 | R1 | Same weight, prior week reps +1 per set | VERIFIED vs RP exactly |
-| R2 | +1 set/exercise/week; new sets get weight + RIR target only | Inferred, mechanism confirmed |
-| R3 | Later sets ≤4 reps or ≥3 below set 1 → ~8% load cut, RIR reset | VERIFIED (60×4 → 55 exact match). The 8% is inferred: 60→55 fits any 4.2-12.5% cut. Set count after the cut (2 vs 3) unconfirmed |
+| R2 | +1 set/exercise/week; new sets get weight + RIR target only | Inferred, mechanism confirmed. RP history shows no weekly adds over 3-4 weeks on EZ curl (see Calibration evidence) |
+| R3 | Later sets ≤4 reps or ≥3 below set 1 → ~8% load cut, RIR reset | VERIFIED (60×4 → 55 exact match). The 8% is inferred: 60→55 fits any 4.2-12.5% cut. Set count after the cut (2 vs 3) unconfirmed. Only the ≤4-rep floor trigger is verified; the ≥3-below-set-1 trigger is contradicted by RP history (5 cases) |
 | R4 | Joint pain ≥ moderate → hold reps, no set add | Inferred |
 | R5 | Workload 'too much' → hold sets; 'not enough' → +2 | Inferred |
 | R6 | All sets skipped → re-prescribe same weights, RIR only | VERIFIED |
-| R7 | Deload wk 6: half sets, 8 RIR | Per RP docs |
+| R7 | Deload wk 6: half sets, 8 RIR | Per RP docs. Contradicted on load: RP's deload day 3 used half weight (60 → 30×5,5) |
 | R8 | Soreness: still sore → hold volume; never sore + low pump → +2 sets | Inferred |
 | Seeding | Wk 1 from hist; >8 wks stale → −10%; maintenance-priority slots start 1 set, full 2 | Design decision |
 
 RIR ramp: 3/2/2/1/0 + deload 8. Days: Mon/Wed/Fri.
+
+## Calibration evidence
+**2026-09-25, RP "Exercise history" screenshots** (DB Press (High Incline), EZ Bar Curl (Normal Grip)). History lists logged sets only: skipped sets and RP's targets are invisible. Readings below assume what was logged = what RP prescribed; owner to confirm.
+- **R1 supported.** EZ curl Wed: 11,9,7 → 12,10,9 → 13,11,10 → 14,12,11. Fri: 10,8,7,7 → 11,9,8,8.
+- **R3 ≥3-below trigger contradicted.** 5 cases where a later set was 3+ reps below set 1 (above the 4-rep floor): RP kept 60 and the next week's reps went up by 1. Example: W2D3 60×10,8,7,7 → engine cuts sets 3-4 to 55; RP history W3D3 = 60×11,9,8,8. The verified 60×4 → 55 case went through the ≤4 floor trigger. The R3 "why" also mislabels this trigger as "below range floor".
+- **R2 not visible.** EZ curl held 3 sets (Wed, W2-W5) and 4 sets (Fri, W2-W4). Could be feedback-gated or skipped add-on sets.
+- **R7 load contradicted.** Incline deload (8-week meso, W8D3) logged 30×5,5 after 60×8-9 working sets: RP halved the load.
+- **Q1 (incline set count after an R3 cut) unresolved.** That session (COPY meso W2D3) was skipped, so no history. Needs RP's day view of it.
+- **Q2 (R6 set count) unresolved.** EZ curl W1D3 3 sets skipped → W2D3 4 sets logged: RP added one, or the owner did.
 
 ## Known gaps / roadmap candidates
 - R2/R5/R8 coefficients unvalidated — owner is parallel-logging in RP for one meso to calibrate; expect tuning PRs
