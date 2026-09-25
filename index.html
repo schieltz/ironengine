@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>IRON ENGINE</title>
+<style>
+:root{
+  --bg:#0E1012; --panel:#171A1D; --panel2:#1E2226; --line:#2A2F34;
+  --ink:#E9E7E2; --ink-dim:#9BA1A6; --ink-faint:#5C6368;
+  --blue:#3D7BD9; --blue-dim:#2A4E85;
+  --green:#3FA372; --red:#C05043; --amber:#C99B3F;
+  --mg-CHEST:#B85C8A; --mg-BACK:#4C93A8; --mg-TRICEPS:#9A5CB8; --mg-BICEPS:#4C7FA8;
+  --mg-SHOULDERS:#B87A5C; --mg-HAMSTRINGS:#5CA86E; --mg-GLUTES:#7FA85C; --mg-QUADS:#A8A05C;
+  --mg-CALVES:#8A7AB8; --mg-TRAPS:#8A8A9E; --mg-FOREARMS:#7A8AB8;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{background:var(--bg);color:var(--ink);font-family:-apple-system,'SF Pro Text',system-ui,sans-serif;
+  font-size:16px;overscroll-behavior-y:contain}
+body{padding-bottom:84px;min-height:100vh}
+button{font-family:inherit;color:inherit;background:none;border:none;cursor:pointer;text-align:inherit}
+input{font-family:inherit;color:inherit}
+header{padding:18px 16px 10px;position:sticky;top:0;background:linear-gradient(var(--bg) 85%,transparent);z-index:20}
+.h-title{font-size:26px;font-weight:800;letter-spacing:-0.5px}
+.h-title .dim{color:var(--ink-faint);font-weight:700}
+.h-sub{color:var(--ink-dim);font-size:13px;margin-top:2px}
+.spine{display:flex;gap:5px;padding:12px 16px 4px}
+.spine .wk{flex:1;text-align:center;padding:7px 0 5px;border-radius:8px;background:var(--panel);
+  border:1px solid var(--line);color:var(--ink-faint)}
+.spine .wk .n{font-size:15px;font-weight:800}
+.spine .wk .r{font-size:9.5px;letter-spacing:.4px;margin-top:1px;text-transform:uppercase}
+.spine .wk.active{background:var(--blue-dim);border-color:var(--blue);color:var(--ink)}
+.spine .wk.done{color:var(--ink-dim);border-color:var(--ink-faint)}
+.daytabs{display:flex;gap:6px;padding:8px 16px 2px}
+.daytabs button{flex:1;padding:9px 0;border-radius:9px;background:var(--panel);border:1px solid var(--line);
+  color:var(--ink-dim);font-size:13px;font-weight:700;text-align:center}
+.daytabs button.active{background:var(--panel2);border-color:var(--blue);color:var(--ink)}
+.daytabs button .st{display:block;font-size:9px;margin-top:2px;font-weight:600;letter-spacing:.5px}
+.daytabs button.complete .st{color:var(--green)}
+.daytabs button.partial .st{color:var(--amber)}
+main{padding:6px 12px}
+.mg-tag{display:inline-block;font-size:10.5px;font-weight:800;letter-spacing:1.2px;padding:4px 10px;
+  border-radius:6px;margin:14px 4px 6px;color:#0E1012;text-transform:uppercase}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:8px}
+.ex-name{font-size:18px;font-weight:800;letter-spacing:-.3px;line-height:1.15}
+.ex-meta{color:var(--ink-faint);font-size:12.5px;margin-top:2px}
+.ex-note{background:#2B2617;color:#D9C27A;font-size:13px;padding:8px 10px;border-radius:8px;margin-top:8px}
+.set-head{display:grid;grid-template-columns:44px 1fr 1fr 56px;gap:8px;padding:10px 2px 4px;
+  color:var(--ink-faint);font-size:10.5px;font-weight:700;letter-spacing:1px;text-align:center}
+.set-row{display:grid;grid-template-columns:44px 1fr 1fr 56px;gap:8px;align-items:center;padding:5px 0}
+.set-num{text-align:center;color:var(--ink-faint);font-size:13px;font-weight:700}
+.set-row input{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:9px;
+  padding:11px 4px;font-size:19px;font-weight:700;text-align:center;color:var(--ink)}
+.set-row input:focus{outline:none;border-color:var(--blue)}
+.set-row input.rir-ph{color:var(--ink-dim);font-size:15px}
+.log-btn{height:44px;border-radius:9px;border:1.5px solid var(--line);background:var(--panel2);
+  font-size:18px;color:var(--ink-faint);text-align:center}
+.log-btn.next{border-color:var(--blue)}
+.log-btn.logged{background:var(--green);border-color:var(--green);color:#0E1012}
+.log-btn.skipped{background:var(--panel2);border-color:var(--ink-faint);color:var(--ink-dim)}
+.why{margin-top:4px;font-size:11.5px;color:var(--ink-faint);padding:0 2px;line-height:1.45}
+.why b{color:var(--blue);font-weight:700}
+.card-actions{display:flex;gap:8px;margin-top:10px}
+.card-actions button{flex:1;padding:9px;border-radius:9px;background:var(--panel2);border:1px solid var(--line);
+  font-size:12.5px;font-weight:700;color:var(--ink-dim);text-align:center}
+.fb-done{border-color:var(--green)!important;color:var(--green)!important}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:rgba(14,16,18,.92);
+  backdrop-filter:blur(14px);border-top:1px solid var(--line);padding:8px 0 max(14px,env(safe-area-inset-bottom));z-index:30}
+nav button{flex:1;text-align:center;color:var(--ink-faint);font-size:10.5px;font-weight:700;padding-top:4px}
+nav button .ic{display:block;font-size:19px;margin-bottom:2px}
+nav button.active{color:var(--blue)}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:40;display:flex;align-items:flex-end}
+.sheet{background:var(--panel);border-radius:18px 18px 0 0;width:100%;padding:22px 18px max(24px,env(safe-area-inset-bottom));
+  max-height:85vh;overflow-y:auto}
+.sheet h2{font-size:24px;font-weight:800;margin-bottom:4px}
+.sheet .q{margin-top:16px}
+.sheet .q h3{font-size:15px;font-weight:700}
+.sheet .q p{color:var(--ink-dim);font-size:13px;margin:3px 0 9px}
+.opts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.opts.o3{grid-template-columns:1fr 1fr 1fr}
+.opts button{padding:13px 6px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);
+  font-size:12.5px;font-weight:600;color:var(--ink);text-align:center}
+.opts button.sel{border-color:var(--blue);background:var(--blue-dim)}
+.sheet-actions{display:flex;gap:10px;margin-top:22px}
+.sheet-actions button{flex:1;padding:14px;border-radius:11px;font-size:15px;font-weight:700;text-align:center}
+.btn-ghost{background:var(--panel2);border:1px solid var(--line);color:var(--ink-dim)}
+.btn-primary{background:var(--blue);color:#fff}
+.btn-primary:disabled{opacity:.35}
+.eng-block{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:10px}
+.eng-block h3{font-size:15px;font-weight:800;color:var(--blue);letter-spacing:.3px;margin-bottom:6px}
+.eng-block p{font-size:13.5px;color:var(--ink-dim);line-height:1.55}
+.eng-block code{background:var(--panel2);padding:1px 6px;border-radius:5px;font-size:12.5px;color:var(--ink)}
+.toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%);background:var(--panel2);
+  border:1px solid var(--blue);color:var(--ink);padding:11px 18px;border-radius:11px;font-size:14px;font-weight:600;
+  z-index:50;white-space:nowrap;opacity:0;transition:opacity .25s;pointer-events:none}
+.toast.show{opacity:1}
+/* library */
+.lib-search{margin:4px 4px 8px;display:flex;gap:8px}
+.lib-search input{flex:1;background:var(--panel);border:1px solid var(--line);border-radius:11px;
+  padding:12px 14px;font-size:15px}
+.lib-search input:focus{outline:none;border-color:var(--blue)}
+.chiprow{display:flex;gap:6px;overflow-x:auto;padding:2px 4px 10px;-webkit-overflow-scrolling:touch}
+.chiprow::-webkit-scrollbar{display:none}
+.chip{flex:0 0 auto;padding:7px 13px;border-radius:99px;background:var(--panel);border:1px solid var(--line);
+  font-size:12.5px;font-weight:700;color:var(--ink-dim);text-align:center}
+.chip.sel{background:var(--blue-dim);border-color:var(--blue);color:var(--ink)}
+.chip.home.sel{background:#1F3326;border-color:var(--green);color:var(--ink)}
+.lib-item{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);
+  border-radius:12px;padding:12px 14px;margin:0 4px 7px;width:calc(100% - 8px)}
+.lib-item .dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
+.lib-item .li-main{flex:1;min-width:0}
+.lib-item .li-name{font-size:15.5px;font-weight:700;line-height:1.2}
+.lib-item .li-sub{font-size:12px;color:var(--ink-faint);margin-top:1px}
+.lib-item .li-right{text-align:right;flex:0 0 auto}
+.lib-item .li-w{font-size:14px;font-weight:800;color:var(--blue)}
+.lib-item .li-date{font-size:10.5px;color:var(--ink-faint)}
+.badge-gym{font-size:9px;font-weight:800;letter-spacing:.6px;background:#33231B;color:#C98B5C;
+  border-radius:5px;padding:2px 6px;margin-left:6px;vertical-align:middle}
+/* builder */
+.slot{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--line);
+  border-radius:12px;padding:12px 14px;margin-bottom:7px;width:100%}
+.slot .swap{color:var(--blue);font-size:13px;font-weight:700;flex:0 0 auto}
+.slot.changed{border-color:var(--amber)}
+.bd-tabs{display:flex;gap:6px;padding:0 4px 10px}
+.bd-tabs button{flex:1;padding:9px 0;border-radius:9px;background:var(--panel);border:1px solid var(--line);
+  color:var(--ink-dim);font-size:13px;font-weight:700;text-align:center}
+.bd-tabs button.active{background:var(--panel2);border-color:var(--blue);color:var(--ink)}
+.bigbtn{display:block;width:calc(100% - 8px);margin:10px 4px;padding:15px;border-radius:12px;
+  background:var(--blue);color:#fff;font-size:15px;font-weight:800;text-align:center}
+.bigbtn.ghost{background:var(--panel);border:1px solid var(--line);color:var(--ink-dim)}
+.session-done{background:var(--blue-dim);border:1px solid var(--blue);border-radius:14px;padding:16px;
+  margin:14px 0;text-align:center}
+.session-done .big{font-size:17px;font-weight:800}
+.session-done .sm{font-size:13px;color:var(--ink-dim);margin-top:3px}
+</style>
+</head>
+<body>
+<header>
+  <div class="h-title" id="hTitle"></div>
+  <div class="h-sub" id="hSub"></div>
+</header>
+<div class="spine" id="spine"></div>
+<div class="daytabs" id="daytabs"></div>
+<main id="main"></main>
+<nav>
+  <button id="navW" class="active" onclick="setView('workout')"><span class="ic">▦</span>Workout</button>
+  <button id="navL" onclick="setView('library')"><span class="ic">≣</span>Library</button>
+  <button id="navB" onclick="setView('builder')"><span class="ic">⧉</span>Builder</button>
+  <button id="navE" onclick="setView('engine')"><span class="ic">ƒ</span>Engine</button>
+  <button id="navD" onclick="setView('data')"><span class="ic">⬒</span>Data</button>
+</nav>
+<div id="modalRoot"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ============================================================
+   IRON ENGINE v2
+   catalog + cross-meso history + meso builder + R8 soreness
+   ============================================================ */
+const store = {
+  mem:{}, _ls:false,
+  init(){ /* localStorage path is for SELF-HOSTED deploys (GitHub Pages) only; never runs inside Claude where window.storage exists */
+    if(!window.storage){ try{ localStorage.setItem('__t','1'); localStorage.removeItem('__t'); this._ls=true; }catch(e){} } },
+  async get(k){ try{ if(window.storage){ const r=await window.storage.get(k); return r?JSON.parse(r.value):null; } }catch(e){}
+    if(this._ls){ try{ const v=localStorage.getItem('ironengine:'+k); return v?JSON.parse(v):null; }catch(e){} }
+    return this.mem[k]??null; },
+  async set(k,v){ this.mem[k]=v;
+    try{ if(window.storage){ await window.storage.set(k,JSON.stringify(v)); return; } }catch(e){}
+    if(this._ls){ try{ localStorage.setItem('ironengine:'+k,JSON.stringify(v)); }catch(e){} } }
+};
+store.init();
+const RIR_RAMP=[3,2,2,1,0], DELOAD_RIR=8, DAYS=['Mon','Wed','Fri'];
+const MGS=['CHEST','BACK','SHOULDERS','TRICEPS','BICEPS','QUADS','GLUTES','HAMSTRINGS','CALVES','FOREARMS'];
+
+/* ---------- exercise catalog: John's performed list from RP ---------- */
+/* [name, mg, equip, lastPerformed] — equip drives home-compatibility */
+const HOME_MACHINES=['Leg Extension','Seated Leg Curl'];
+function isHome(c){
+  if(['Barbell','Dumbbell','Cable','Bodyweight Only','Bodyweight Loadable'].includes(c.equip)) return true;
+  return HOME_MACHINES.includes(c.name);
+}
+const CATALOG=[
+/* CALVES */
+['Stair Calves','CALVES','Bodyweight Only','2025-09-23'],
+['Stair Calves (Single Leg)','CALVES','Bodyweight Only','2026-01-26'],
+['Standing Calf Raise','CALVES','Machine','2026-02-10'],
+['Smith Machine Calves','CALVES','Smith Machine','2025-04-26'],
+['Calf Machine','CALVES','Machine','2026-03-01'],
+/* HAMSTRINGS */
+['Stiff-Legged Deadlift','HAMSTRINGS','Barbell','2026-07-18'],
+['Dumbbell Stiff Legged Deadlift','HAMSTRINGS','Dumbbell','2025-11-08'],
+['Seated Leg Curl','HAMSTRINGS','Machine','2025-11-08'],
+['Nordic Curl','HAMSTRINGS','Bodyweight Only','2026-02-21'],
+['Back Raise (45 degree)','HAMSTRINGS','Bodyweight Only','2026-01-06'],
+['Back Raise (Glute Ham Deck)','HAMSTRINGS','Bodyweight Only','2025-06-21'],
+['Barbell Good Morning (High Bar)','HAMSTRINGS','Barbell','2025-10-02'],
+/* BACK */
+['T-Bar Row','BACK','Machine','2025-10-04'],
+['Seated Cable Row','BACK','Cable','2025-06-21'],
+['Smith Machine Row','BACK','Smith Machine','2025-05-17'],
+['Pullup (Normal Grip)','BACK','Bodyweight Only','2026-02-01'],
+['Pullup (Parallel Grip)','BACK','Bodyweight Only','2025-09-28'],
+['Pullup (Weighted, Normal Grip)','BACK','Bodyweight Loadable','2026-02-21'],
+['Pulldown (Narrow Grip)','BACK','Cable','2026-03-14'],
+['Pulldown (Normal Grip)','BACK','Cable','2025-12-04'],
+['Pulldown (Wide Grip)','BACK','Cable','2025-10-25'],
+['Machine Pulldown','BACK','Machine','2026-05-16'],
+['Machine Chest Supported Row','BACK','Machine','2026-03-01'],
+['Chest Supported Row','BACK','Machine','2026-07-18'],
+['Landmine Row','BACK','Barbell','2025-07-21'],
+['Dumbbell Row (2-Arm)','BACK','Dumbbell','2026-01-17'],
+['Barbell Bent Over Row','BACK','Barbell','2026-07-04'],
+['Deadlift','BACK','Barbell','2026-07-04'],
+['Back Extension','BACK','Bodyweight Loadable','2026-05-16'],
+/* GLUTES */
+['Trap Bar Deadlift','GLUTES','Barbell','2025-07-18'],
+['Romanian Deadlift','GLUTES','Barbell','2026-07-06'],
+['Deadlift (Glute-Focused)','GLUTES','Barbell','2026-02-21'],
+['Deadlift (Deficit)','GLUTES','Barbell','2026-01-06'],
+['Reverse Lunge (Barbell)','GLUTES','Barbell','2026-02-10'],
+['Smith Machine Split Squat','GLUTES','Smith Machine','2025-10-08'],
+['Barbell Squat (Sumo Stance)','GLUTES','Barbell','2025-04-15'],
+['Belt Squat (Wide Stance)','GLUTES','Machine','2025-07-07'],
+['Dumbbell Split Squat','GLUTES','Dumbbell','2025-11-08'],
+['Bulgarian Split Squat (Glute-Focused)','GLUTES','Dumbbell','2025-11-19'],
+/* QUADS */
+['Zercher Squat','QUADS','Barbell','2026-07-04'],
+['Smith Machine Squat (Feet Forward)','QUADS','Smith Machine','2025-10-28'],
+['Pendulum Squat','QUADS','Machine','2026-05-16'],
+['Goblet Squat','QUADS','Dumbbell','2025-10-23'],
+['Leg Extension','QUADS','Machine','2026-03-15'],
+['Leg Press','QUADS','Machine','2025-08-05'],
+['Front Squat','QUADS','Barbell','2025-11-20'],
+['Barbell Squat (High Bar)','QUADS','Barbell','2026-06-03'],
+['Bulgarian Split Squat (Quad-Focused)','QUADS','Dumbbell','2025-11-15'],
+/* CHEST */
+['Pullover','CHEST','Dumbbell','2025-07-14'],
+['Pushup (Narrow Grip)','CHEST','Bodyweight Only','2025-11-26'],
+['Machine Chest Press','CHEST','Machine','2025-11-08'],
+['Machine Chest Press (Incline)','CHEST','Machine','2026-03-01'],
+['Machine Flye','CHEST','Machine','2025-12-01'],
+['Hammer Machine Chest Press (Incline)','CHEST','Machine','2026-01-13'],
+['Dumbbell Press (Medium Incline)','CHEST','Dumbbell','2026-02-11'],
+['Dumbbell Press (High Incline)','CHEST','Dumbbell','2026-07-18'],
+['Dip (Chest-Focused)','CHEST','Bodyweight Only','2025-10-04'],
+['Dip (Weighted, Chest-Focused)','CHEST','Bodyweight Loadable','2026-02-21'],
+['Bench Press (Medium Grip)','CHEST','Barbell','2026-07-06'],
+/* SHOULDERS */
+['Smith Machine Shoulder Press (Seated)','SHOULDERS','Smith Machine','2025-06-24'],
+['Machine Shoulder Press','SHOULDERS','Machine','2026-03-01'],
+['Machine Lateral Raise','SHOULDERS','Machine','2025-07-07'],
+['Cable Rope Facepull','SHOULDERS','Cable','2025-07-10'],
+['Cable Upright Row','SHOULDERS','Cable','2026-07-14'],
+['Cable Cross Body Lateral Raise','SHOULDERS','Cable','2026-02-21'],
+['Cable Lateral Raise (Single-Arm)','SHOULDERS','Cable','2026-05-23'],
+['Dumbbell Shoulder Press (Seated)','SHOULDERS','Dumbbell','2026-01-17'],
+['Dumbbell Shoulder Press (Standing)','SHOULDERS','Dumbbell','2026-07-16'],
+['Dumbbell Lateral Raise','SHOULDERS','Dumbbell','2026-07-09'],
+['Dumbbell Lateral Raise (Super ROM)','SHOULDERS','Dumbbell','2025-06-23'],
+['Barbell Shoulder Press (Standing)','SHOULDERS','Barbell','2026-02-16'],
+/* TRICEPS */
+['Machine Triceps Extension','TRICEPS','Machine','2026-03-01'],
+['EZ Bar Overhead Triceps Extension','TRICEPS','Barbell','2025-06-16'],
+['EZ Bar Overhead Triceps Extension (Seated)','TRICEPS','Barbell','2025-05-26'],
+['EZ Bar Skullcrusher','TRICEPS','Barbell','2026-05-15'],
+['Barbell Skullcrusher','TRICEPS','Barbell','2025-05-08'],
+['Barbell Overhead Triceps Extension','TRICEPS','Barbell','2025-05-12'],
+['Dumbbell Skullcrusher','TRICEPS','Dumbbell','2026-03-20'],
+['Dumbbell Overhead Extension','TRICEPS','Dumbbell','2025-05-19'],
+['Dip Machine','TRICEPS','Machine','2025-07-07'],
+['Dip (Triceps-Focused)','TRICEPS','Bodyweight Only','2026-01-13'],
+['Dip (Weighted, Triceps-Focused)','TRICEPS','Bodyweight Loadable','2026-07-14'],
+['Cable Overhead Triceps Extension (Rope)','TRICEPS','Cable','2026-05-13'],
+['Cable Triceps Pushdown (Bar)','TRICEPS','Cable','2026-07-14'],
+['Cable Triceps Pushdown (Rope)','TRICEPS','Cable','2026-01-26'],
+['Bench Press (Close Grip)','TRICEPS','Barbell','2026-07-16'],
+/* BICEPS */
+['EZ Bar Curl (Narrow Grip)','BICEPS','Barbell','2026-02-21'],
+['EZ Bar Curl (Normal Grip)','BICEPS','Barbell','2026-07-16'],
+['EZ Bar Curl (Wide Grip)','BICEPS','Barbell','2025-11-07'],
+['Barbell Curl (Normal Grip)','BICEPS','Barbell','2025-10-30'],
+['Hammer Curl','BICEPS','Dumbbell','2026-07-16'],
+['Dumbbell Curl (Alternating)','BICEPS','Dumbbell','2026-06-24'],
+['Dumbbell Curl (Incline)','BICEPS','Dumbbell','2025-10-12'],
+['Cable Curl','BICEPS','Cable','2026-07-14'],
+['Cable Curl (EZ Bar)','BICEPS','Cable','2025-07-01'],
+['Lying Cable Curl','BICEPS','Cable','2025-07-04'],
+['Machine Preacher Curl','BICEPS','Machine','2026-03-01'],
+/* FOREARMS */
+['Reverse Curl','FOREARMS','Barbell',null],
+].map(([name,mg,equip,last])=>({name,mg,equip,last}));
+CATALOG.forEach(c=>c.home=isHome(c));
+const CAT_BY_NAME=Object.fromEntries(CATALOG.map(c=>[c.name,c]));
+
+/* ---------- meso template library (from RP Templates tab) ----------
+   slot: [MG, pri] — pri 1 = full priority (start 2 sets), 0 = maintenance (start 1 set)
+   optional third element pins a specific exercise (Casey Kelly template) */
+const TEMPLATES=[
+{name:'Upper Body Emphasis',days:[
+  [['CHEST',1],['CHEST',1],['BACK',1],['TRICEPS',1],['BICEPS',1],['SHOULDERS',1],['QUADS',0],['HAMSTRINGS',0]],
+  [['BICEPS',1],['BICEPS',1],['TRICEPS',1],['TRICEPS',1],['BACK',1],['CHEST',1],['SHOULDERS',1],['QUADS',0],['GLUTES',0]],
+  [['BACK',1],['BACK',1],['SHOULDERS',1],['BICEPS',1],['TRICEPS',1],['CHEST',1],['GLUTES',0],['HAMSTRINGS',0]]]},
+{name:'Chest and Back Emphasis',days:[
+  [['CHEST',1],['CHEST',1],['BACK',1],['TRICEPS',0],['SHOULDERS',0],['QUADS',0]],
+  [['BACK',1],['BACK',1],['CHEST',1],['BICEPS',0],['SHOULDERS',0],['HAMSTRINGS',0]],
+  [['BACK',1],['CHEST',1],['TRICEPS',0],['BICEPS',0],['SHOULDERS',0],['QUADS',0],['HAMSTRINGS',0]]]},
+{name:'Arms & Shoulders Emphasis',days:[
+  [['TRICEPS',1],['TRICEPS',1],['SHOULDERS',1],['BICEPS',1],['CHEST',0],['QUADS',0]],
+  [['BICEPS',1],['BICEPS',1],['TRICEPS',1],['SHOULDERS',1],['BACK',0],['HAMSTRINGS',0]],
+  [['SHOULDERS',1],['SHOULDERS',1],['BICEPS',1],['TRICEPS',1],['CHEST',0],['BACK',0],['QUADS',0],['HAMSTRINGS',0]]]},
+{name:'Back & Biceps Emphasis',days:[
+  [['BACK',1],['BACK',1],['BICEPS',1],['SHOULDERS',0],['QUADS',0],['HAMSTRINGS',0]],
+  [['BICEPS',1],['BICEPS',1],['BACK',1],['SHOULDERS',0],['CHEST',0],['TRICEPS',0]],
+  [['BACK',1],['BACK',1],['BICEPS',1],['BICEPS',1],['SHOULDERS',0],['CHEST',0],['QUADS',0],['HAMSTRINGS',0]]]},
+{name:'Whole Body Daily',days:[
+  [['CHEST',1],['TRICEPS',1],['BACK',1],['BICEPS',1],['SHOULDERS',1],['QUADS',1],['GLUTES',1],['HAMSTRINGS',1],['CALVES',1]],
+  [['QUADS',1],['GLUTES',1],['HAMSTRINGS',1],['CALVES',1],['CHEST',1],['TRICEPS',1],['BACK',1],['BICEPS',1],['SHOULDERS',1]],
+  [['SHOULDERS',1],['BICEPS',1],['BACK',1],['TRICEPS',1],['CHEST',1],['CALVES',1],['HAMSTRINGS',1],['GLUTES',1],['QUADS',1]]]},
+{name:'Casey Kelly All Levels of Natty',days:[
+  [['BACK',1,'Dumbbell Row (2-Arm)'],['BACK',1,'Chest Supported Row'],['BACK',1,'Machine Chest Supported Row'],
+   ['CHEST',1,'Dumbbell Press (Medium Incline)'],['CHEST',1,'Machine Chest Press'],['CHEST',1,'Pullover']],
+  [['SHOULDERS',1,'Cable Rope Facepull'],['SHOULDERS',1,'Dumbbell Press (High Incline)'],['SHOULDERS',1,'Dumbbell Lateral Raise'],
+   ['BICEPS',1,'EZ Bar Curl (Normal Grip)'],['FOREARMS',1,'Reverse Curl'],['TRICEPS',1,'Cable Triceps Pushdown (Bar)']],
+  [['QUADS',1,'Barbell Squat (High Bar)'],['QUADS',1,'Leg Extension'],['HAMSTRINGS',1,'Seated Leg Curl'],
+   ['CALVES',1,'Standing Calf Raise']]]},
+];
+
+/* ---------- seed current meso (from RP screenshots) ---------- */
+function seedState(){
+  const ex=(name,note)=>{const c=CAT_BY_NAME[name]||{mg:'BACK',equip:'?'};
+    return {name,mg:c.mg,equip:c.equip,note:note||null,feedback:null};};
+  const meso={name:'New meso plan',weeks:5,curWeek:2,curDay:3,days:[[],[],[]],log:{}};
+  meso.days[0]=[ex('Dip (Weighted, Triceps-Focused)'),ex('Cable Triceps Pushdown (Bar)'),
+    ex('Cable Upright Row'),ex('Cable Curl','Straight bar'),ex('Bench Press (Medium Grip)'),ex('Romanian Deadlift')];
+  meso.days[1]=[ex('EZ Bar Curl (Normal Grip)'),ex('Hammer Curl'),ex('Bench Press (Close Grip)'),
+    ex('Dumbbell Shoulder Press (Standing)'),ex('Chest Supported Row','At home, manta bar'),ex('Stiff-Legged Deadlift')];
+  meso.days[2]=[ex('Dumbbell Lateral Raise'),ex('Cable Upright Row'),ex('EZ Bar Curl (Normal Grip)'),
+    ex('Bench Press (Close Grip)'),ex('Dumbbell Press (High Incline)'),ex('Barbell Bent Over Row'),
+    ex('Deadlift'),ex('Zercher Squat')];
+  const L=(w,r)=>({w,reps:r,st:'logged'}), S=(w)=>({w,reps:null,st:'skipped'});
+  meso.log['w1d3']=[[L(20,9),L(20,8)],[L(30,10),L(30,8)],[S(60),S(60),S(60)],[L(120,10),L(120,9)],
+    [L(60,5),L(60,4)],[S(120),S(120)],[S(300),S(300)],[S(120),S(120)]];
+  meso.log['w2d1']=[[L(40,10),L(40,9)],[L(30,14),L(30,12)],[L(30,10),L(30,9),L(30,8)],
+    [L(30,10),L(30,10),L(30,8)],[S(120),S(175)],[S(175),S(175)]];
+  meso.log['w2d2']=[[L(60,11),L(60,9),L(60,7)],[L(20,8),L(20,7),L(20,7)],[L(120,12),L(120,11)],
+    [L(40,11),L(40,8),L(40,7)],[L(65,11),L(65,8)],[L(120,9)]];
+  meso.log['w2d3']=[[L(20,8),L(20,7),L(20,7)],[L(30,8)],[L(60,10),L(60,8),L(60,7),L(60,7)],
+    null,null,null,null,null];
+  /* cross-meso history: name → {w:last top-set weight, date} */
+  const hist={
+    'Deadlift':{w:300,date:'2026-07-04'},'Zercher Squat':{w:120,date:'2026-07-04'},
+    'Romanian Deadlift':{w:175,date:'2026-07-06'},'Bench Press (Medium Grip)':{w:175,date:'2026-07-06'},
+    'Barbell Bent Over Row':{w:120,date:'2026-07-04'},
+  };
+  return {meso,hist,draft:null};
+}
+
+/* ============================================================
+   PROGRESSION ENGINE v2 — R1..R8
+   R8 soreness (recovery gate): asked per muscle at next session.
+   0 never sore · 1 healed a while ago · 2 healed just on time · 3 still sore
+   ============================================================ */
+function roundLoad(w){ return Math.max(5,Math.round(w/5)*5); }
+function weeksSince(dateStr){
+  return Math.floor((Date.now()-new Date(dateStr).getTime())/(7*86400*1000));
+}
+function startingSets(name,hist,rir,nSets){
+  const n=nSets||2;
+  const h=hist[name], why=[];
+  const mk=w=>Array.from({length:n},()=>({w,tgt:null,rir,st:null,reps:null}));
+  if(!h){ return {sets:mk(null),
+    why:`No history for this exercise → enter a weight you can handle at ${rir} RIR; that seeds the engine.${n===1?' Maintenance-priority slot: 1 starting set.':''}`}; }
+  let w=h.w; const wk=weeksSince(h.date);
+  if(wk>8){ w=roundLoad(w*0.9); why.push(`Last performed ${wk} wks ago → starting load discounted 10% to <b>${w}</b> (detraining buffer).`); }
+  else why.push(`Seeded from your last top set: <b>${w}</b>.`);
+  why.push(`Work to ${rir} RIR — week 1 results become the baseline.`);
+  if(n===1) why.push(`Maintenance-priority slot: 1 starting set.`);
+  return {sets:mk(w),why:why.join(' ')};
+}
+function prescribe(ex, prevSets, week, feedback){
+  const rir = week>5 ? DELOAD_RIR : RIR_RAMP[week-1];
+  const why=[];
+  const logged=(prevSets||[]).filter(s=>s && s.st==='logged' && s.reps!=null);
+  if(!prevSets || logged.length===0){
+    const base=(prevSets&&prevSets.length?prevSets:[{w:0}]).map(s=>({w:s.w,tgt:null,rir,st:null,reps:null}));
+    return {sets:base,why:`No logged sets last week → same weights, work to <b>${rir} RIR</b> (R6).`};
+  }
+  if(week>5){
+    const n=Math.max(1,Math.ceil(logged.length/2));
+    return {sets:logged.slice(0,n).map(s=>({w:s.w,tgt:null,rir:DELOAD_RIR,st:null,reps:null})),
+      why:`Deload: <b>${n} set${n>1?'s':''}</b> at 8 RIR — dissipate fatigue (R7).`};
+  }
+  const f=feedback||{};
+  const painGate=f.pain>=2, soreGate=f.soreness===3;
+  const firstReps=logged[0].reps;
+  const sets=logged.map((s,i)=>{
+    if(i>0 && (s.reps<=4 || (firstReps-s.reps)>=3)){
+      const w=roundLoad(s.w*0.92);
+      why.push(`Set ${i+1}: ${s.reps} reps last week (below range floor) → load cut to <b>${w}</b>, ${rir} RIR (R3).`);
+      return {w,tgt:null,rir,st:null,reps:null};
+    }
+    return {w:s.w,tgt:painGate?s.reps:s.reps+1,rir:null,st:null,reps:null};
+  });
+  if(painGate){ why.push(`Joint pain → rep targets held, no set added (R4).`); return {sets,why:why.join(' ')}; }
+  why.unshift(`Same weight, last week's reps <b>+1</b> (R1).`);
+  if(soreGate){ why.push(`Still sore from last session → volume held, no set added (R8).`); }
+  else if(f.workload===3){ why.push(`'Too much' workload → set count held (R5).`); }
+  else{
+    const strongAdd=(f.workload===0)||(f.soreness===0 && f.pump===0);
+    const adds=strongAdd?2:1;
+    const lastW=sets[sets.length-1].w;
+    for(let a=0;a<adds;a++) sets.push({w:lastW,tgt:null,rir,st:null,reps:null});
+    why.push(`+${adds} set at <b>${lastW}</b> to <b>${rir} RIR</b> (R2${strongAdd?'+R5/R8: under-stimulated signal':''}).`);
+  }
+  return {sets,why:why.join(' ')};
+}
+
+/* ============================================================ UI ============ */
+let ST=null, view='workout', selWeek=2, selDay=3;
+let libQ='', libMg='ALL', libHome=true, swapCtx=null, bdDay=1;
+const $=id=>document.getElementById(id);
+function toast(t){ const el=$('toast'); el.textContent=t; el.classList.add('show'); setTimeout(()=>el.classList.remove('show'),1900); }
+const esc=s=>s.replace(/'/g,"\\'");
+
+async function init(){
+  ST=await store.get('state2') || seedState();
+  selWeek=ST.meso.curWeek; selDay=ST.meso.curDay;
+  await ensureDay(selWeek,selDay); render();
+}
+async function save(){ await store.set('state2',ST); }
+function key(w,d){ return `w${w}d${d}`; }
+
+async function ensureDay(w,d){
+  const M=ST.meso, k=key(w,d);
+  if(M.log[k] && M.log[k].every(s=>s!==null)) return;
+  const prev=M.log[key(w-1,d)], exs=M.days[d-1];
+  if(!M.log[k]) M.log[k]=exs.map(()=>null);
+  exs.forEach((ex,i)=>{
+    if(M.log[k][i]) return;
+    let p;
+    if(w===1 && !prev) p=startingSets(ex.name,ST.hist,RIR_RAMP[0],ex.pri===0?1:2);
+    else p=prescribe(ex, prev?prev[i]:null, w, ex.feedback);
+    M.log[k][i]=p.sets;
+    ex._why=ex._why||{}; ex._why[k]=p.why;
+  });
+  await save();
+}
+
+function render(){
+  renderHeader(); renderSpine(); renderTabs();
+  ({workout:renderWorkout,library:renderLibrary,builder:renderBuilder,engine:renderEngine,data:renderData})[view]();
+  ['navW','navL','navB','navE','navD'].forEach(id=>$(id).classList.remove('active'));
+  $({workout:'navW',library:'navL',builder:'navB',engine:'navE',data:'navD'}[view]).classList.add('active');
+}
+function renderHeader(){
+  const M=ST.meso;
+  const titles={workout:`WEEK ${selWeek} <span class="dim">DAY ${selDay}</span>`,library:'LIBRARY',
+    builder:'MESO BUILDER',engine:'THE ENGINE',data:'DATA'};
+  const subs={workout:`${DAYS[selDay-1]} · ${M.name} · target ${selWeek>5?DELOAD_RIR:RIR_RAMP[selWeek-1]} RIR`,
+    library:`${CATALOG.length} performed exercises · tap for history`,
+    builder: ST.draft?`Draft: ${ST.draft.name}`:'Plan your next mesocycle',
+    engine:'Every number, explained. No black box.',data:'Export, reset, storage'};
+  $('hTitle').innerHTML=titles[view]; $('hSub').textContent=subs[view];
+}
+function renderSpine(){
+  const el=$('spine');
+  if(view!=='workout'){ el.innerHTML=''; return; }
+  el.innerHTML=Array.from({length:6},(_,i)=>{
+    const w=i+1, rir=w>5?'DL · 8 RIR':RIR_RAMP[i]+' RIR';
+    const cls=w===selWeek?'active':(w<ST.meso.curWeek?'done':'');
+    return `<button class="wk ${cls}" onclick="pickWeek(${w})"><div class="n">${w>5?'DL':w}</div><div class="r">${rir}</div></button>`;
+  }).join('');
+}
+function renderTabs(){
+  const el=$('daytabs'); const M=ST.meso;
+  if(view!=='workout'){ el.innerHTML=''; return; }
+  el.innerHTML=DAYS.map((d,i)=>{
+    const k=key(selWeek,i+1), log=M.log[k];
+    let st='—';
+    if(log&&log.some(x=>x)){
+      const flat=log.filter(x=>x).flat(), done=flat.filter(s=>s.st).length;
+      st=done===flat.length&&done>0?'COMPLETE':done>0?`${done}/${flat.length}`:'PLANNED';
+    }
+    const stCls=st==='COMPLETE'?'complete':(st!=='—'&&st!=='PLANNED'?'partial':'');
+    return `<button class="${i+1===selDay?'active':''} ${stCls}" onclick="pickDay(${i+1})">${d}<span class="st">${st}</span></button>`;
+  }).join('');
+}
+async function pickWeek(w){ selWeek=w; await ensureDay(w,selDay); render(); }
+async function pickDay(d){ selDay=d; await ensureDay(selWeek,d); render(); }
+function setView(v){ view=v; render(); }
+
+/* ---------- workout ---------- */
+function renderWorkout(){
+  const M=ST.meso, k=key(selWeek,selDay), exs=M.days[selDay-1], log=M.log[k];
+  let html='', lastMg='';
+  exs.forEach((ex,i)=>{
+    const sets=log[i]||[];
+    if(ex.mg!==lastMg){ html+=`<span class="mg-tag" style="background:var(--mg-${ex.mg})">${ex.mg}</span>`; lastMg=ex.mg; }
+    const why=ex._why&&ex._why[k]?`<div class="why">→ ${ex._why[k]}</div>`:'';
+    html+=`<div class="card">
+      <div class="ex-name">${ex.name}</div>
+      <div class="ex-meta">${ex.equip}${CAT_BY_NAME[ex.name]&&!CAT_BY_NAME[ex.name].home?'<span class="badge-gym">GYM</span>':''}</div>
+      ${ex.note?`<div class="ex-note">📌 ${ex.note}</div>`:''}
+      <div class="set-head"><span></span><span>WEIGHT</span><span>REPS</span><span>LOG</span></div>
+      ${sets.map((s,j)=>setRow(i,j,s)).join('')}
+      ${why}
+      <div class="card-actions">
+        <button onclick="addSet(${i})">+ Set</button>
+        <button class="${ex.feedback?'fb-done':''}" onclick="openFeedback(${i})">${ex.feedback?'✓ Feedback':'Feedback'}</button>
+      </div>
+    </div>`;
+  });
+  const flat=log.filter(x=>x).flat();
+  if(flat.length>0&&flat.every(s=>s.st))
+    html+=`<div class="session-done"><div class="big">Session complete</div>
+      <div class="sm">Next week's targets are computed from today's numbers.</div></div>`;
+  $('main').innerHTML=html;
+}
+function setRow(ei,si,s){
+  const repVal=s.st==='skipped'?'':(s.reps!=null?s.reps:(s.tgt!=null?s.tgt:''));
+  const repPh=s.st==='skipped'?'skipped':(s.tgt==null&&s.reps==null?`${s.rir??2} RIR`:'');
+  const btnCls=s.st==='logged'?'logged':s.st==='skipped'?'skipped':'next';
+  const btnTxt=s.st==='logged'?'✓':s.st==='skipped'?'−':'';
+  return `<div class="set-row">
+    <span class="set-num">${si+1}</span>
+    <input type="number" inputmode="decimal" value="${s.w??''}" onchange="upd(${ei},${si},'w',this.value)">
+    <input type="number" inputmode="numeric" class="${repPh?'rir-ph':''}" value="${repVal}" placeholder="${repPh}"
+      onchange="upd(${ei},${si},'reps',this.value)">
+    <button class="log-btn ${btnCls}" onclick="cycleLog(${ei},${si})">${btnTxt}</button>
+  </div>`;
+}
+async function upd(ei,si,f,v){
+  ST.meso.log[key(selWeek,selDay)][ei][si][f]=v===''?null:parseFloat(v);
+  await save();
+}
+async function cycleLog(ei,si){
+  const s=ST.meso.log[key(selWeek,selDay)][ei][si];
+  if(!s.st){
+    if(s.reps==null && s.tgt==null && s._skipArm){ delete s._skipArm; s.st='skipped'; await save(); render(); return; }
+    if(s.reps==null && s.tgt!=null) s.reps=s.tgt;
+    if(s.reps==null){ toast('Enter reps first — tap again to skip'); s._skipArm=true; return; }
+    s.st='logged';
+  } else if(s.st==='logged'){ s.st='skipped'; s.reps=null; }
+  else s.st=null;
+  await save(); render();
+}
+async function addSet(ei){
+  const sets=ST.meso.log[key(selWeek,selDay)][ei];
+  const lastW=sets.length?sets[sets.length-1].w:null;
+  sets.push({w:lastW,tgt:null,rir:selWeek>5?DELOAD_RIR:RIR_RAMP[selWeek-1],st:null,reps:null});
+  await save(); render();
+}
+
+/* ---------- feedback (now incl. soreness R8) ---------- */
+let fbState=null;
+function openFeedback(ei){
+  const ex=ST.meso.days[selDay-1][ei];
+  fbState={ei,soreness:ex.feedback?.soreness??null,pain:ex.feedback?.pain??null,
+    pump:ex.feedback?.pump??null,workload:ex.feedback?.workload??null};
+  renderFB();
+}
+function renderFB(){
+  const ex=ST.meso.days[selDay-1][fbState.ei];
+  const opt=(f,i,l)=>`<button class="${fbState[f]===i?'sel':''}" onclick="fbState.${f}=${i};renderFB()">${l}</button>`;
+  $('modalRoot').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeFB()">
+    <div class="sheet">
+      <h2>Feedback</h2>
+      <p style="color:var(--ink-dim);font-size:13px">${ex.name} · ${ex.mg.toLowerCase()}</p>
+      <div class="q"><h3>${cap(ex.mg)} soreness</h3><p>How sore did you get AFTER training them last time?</p>
+        <div class="opts">${['Never got sore','Healed a while ago','Healed just on time',"I'm still sore!"].map((l,i)=>opt('soreness',i,l)).join('')}</div></div>
+      <div class="q"><h3>Joint pain</h3><p>How did your joints feel during this exercise?</p>
+        <div class="opts">${['None','Low pain','Moderate pain','A lot of pain'].map((l,i)=>opt('pain',i,l)).join('')}</div></div>
+      <div class="q"><h3>Pump</h3><p>How much of a pump in your ${ex.mg.toLowerCase()}?</p>
+        <div class="opts o3">${['Low pump','Moderate pump','Amazing pump'].map((l,i)=>opt('pump',i,l)).join('')}</div></div>
+      <div class="q"><h3>Workload</h3><p>How was the number of hard sets?</p>
+        <div class="opts">${['Not enough','Just right','Pushed my limits','Too much'].map((l,i)=>opt('workload',i,l)).join('')}</div></div>
+      <div class="sheet-actions">
+        <button class="btn-ghost" onclick="closeFB()">Cancel</button>
+        <button class="btn-primary" ${[fbState.soreness,fbState.pain,fbState.pump,fbState.workload].some(x=>x==null)?'disabled':''}
+          onclick="saveFB()">Save</button>
+      </div>
+    </div></div>`;
+}
+const cap=s=>s[0]+s.slice(1).toLowerCase();
+function closeFB(){ $('modalRoot').innerHTML=''; fbState=null; }
+async function saveFB(){
+  const ex=ST.meso.days[selDay-1][fbState.ei];
+  ex.feedback={soreness:fbState.soreness,pain:fbState.pain,pump:fbState.pump,workload:fbState.workload};
+  await save(); closeFB(); render(); toast('Saved — feeds next week (R2/R4/R5/R8)');
+}
+
+/* ---------- library ---------- */
+function renderLibrary(){
+  const list=CATALOG.filter(c=>
+    (libMg==='ALL'||c.mg===libMg) &&
+    (!libHome||c.home) &&
+    (!libQ||c.name.toLowerCase().includes(libQ.toLowerCase())));
+  list.sort((a,b)=>a.name.localeCompare(b.name));
+  $('main').innerHTML=`
+    <div class="lib-search"><input placeholder="Search ${CATALOG.length} exercises" value="${libQ}"
+      oninput="libQ=this.value;renderLibrary()"></div>
+    <div class="chiprow">
+      <button class="chip home ${libHome?'sel':''}" onclick="libHome=!libHome;renderLibrary()">⌂ Home only</button>
+      <button class="chip ${libMg==='ALL'?'sel':''}" onclick="libMg='ALL';renderLibrary()">All</button>
+      ${MGS.map(m=>`<button class="chip ${libMg===m?'sel':''}" onclick="libMg='${m}';renderLibrary()">${cap(m)}</button>`).join('')}
+    </div>
+    ${list.map(c=>{
+      const h=ST.hist[c.name];
+      return `<button class="lib-item" onclick="toast('${esc(c.name)} — last: ${c.last}${h?' @ '+h.w:''}')">
+        <span class="dot" style="background:var(--mg-${c.mg})"></span>
+        <span class="li-main"><span class="li-name">${c.name}${c.home?'':'<span class="badge-gym">GYM</span>'}</span>
+        <span class="li-sub">${cap(c.mg)} · ${c.equip}</span></span>
+        <span class="li-right">${h?`<div class="li-w">${h.w}</div>`:''}<div class="li-date">${c.last}</div></span>
+      </button>`;}).join('')||'<p style="color:var(--ink-faint);padding:20px;text-align:center">No matches</p>'}`;
+}
+
+/* ---------- meso builder ---------- */
+function renderBuilder(){
+  if(!ST.draft){
+    $('main').innerHTML=`
+      <div class="eng-block"><h3>Two ways to draft</h3>
+      <p><b>Copy current</b> keeps your exercises and lets you swap slots. <b>From template</b> starts with an RP-style
+      muscle-group blueprint — each slot is auto-filled with your most recent home-compatible exercise for that muscle
+      (tap to swap). Full-priority slots start at 2 sets, maintenance slots at 1; the engine grows both. Either way,
+      history follows every exercise.</p></div>
+      <button class="bigbtn" onclick="makeDraft()">Draft from current meso</button>
+      <div class="mg-tag" style="background:var(--panel2);color:var(--ink-dim)">TEMPLATE LIBRARY</div>
+      ${TEMPLATES.map((t,i)=>`<button class="slot" onclick="makeDraftFromTemplate(${i})">
+        <span class="li-main"><span class="li-name">${t.name}</span>
+        <span class="li-sub">${t.days.map((d,j)=>DAYS[j]+' '+d.length).join(' · ')} slots ·
+        ${t.days.flat().filter(s=>s[1]===0).length} maintenance</span></span>
+        <span class="swap">Use ›</span></button>`).join('')}`;
+    return;
+  }
+  const D=ST.draft, dayExs=D.days[bdDay-1];
+  let lastMg='';
+  $('main').innerHTML=`
+    <div class="bd-tabs">${DAYS.map((d,i)=>`<button class="${bdDay===i+1?'active':''}"
+      onclick="bdDay=${i+1};render()">${d}</button>`).join('')}</div>
+    ${dayExs.map((ex,i)=>{
+      const tag=ex.mg!==lastMg?`<span class="mg-tag" style="background:var(--mg-${ex.mg})">${ex.mg}</span>`:'';
+      lastMg=ex.mg;
+      const h=ST.hist[ex.name];
+      const priTag=ex.pri===0?' · <span style="color:var(--amber)">maintenance</span>':'';
+      return tag+`<button class="slot ${ex._swapped?'changed':''}" onclick="openSwap(${i})">
+        <span class="dot" style="background:var(--mg-${ex.mg});width:9px;height:9px;border-radius:50%;flex:0 0 auto"></span>
+        <span class="li-main"><span class="li-name">${ex.name}</span>
+        <span class="li-sub">${ex.equip}${h?` · last ${h.w}`:''}${priTag}</span></span>
+        <span class="swap">Swap ›</span></button>`;
+    }).join('')}
+    <button class="bigbtn" onclick="activateDraft()">Activate meso — archive current</button>
+    <button class="bigbtn ghost" onclick="ST.draft=null;save();render()">Discard draft</button>`;
+}
+async function makeDraft(){
+  const M=ST.meso;
+  ST.draft={name:'Next meso (draft)',weeks:5,
+    days:M.days.map(day=>day.map(ex=>({name:ex.name,mg:ex.mg,equip:ex.equip,note:ex.note,pri:ex.pri??1,feedback:null})))};
+  bdDay=1; await save(); render();
+}
+/* most recently performed home-compatible exercise per mg, excluding already-used names */
+function autoPick(mg,used){
+  const cands=CATALOG.filter(c=>c.mg===mg&&c.home&&!used.has(c.name))
+    .sort((a,b)=>(b.last||'').localeCompare(a.last||''));
+  return cands[0]||CATALOG.find(c=>c.mg===mg&&c.home)||CATALOG.find(c=>c.mg===mg);
+}
+async function makeDraftFromTemplate(ti){
+  const t=TEMPLATES[ti];
+  ST.draft={name:t.name+' (draft)',weeks:5,days:t.days.map(day=>{
+    const used=new Set();
+    return day.map(([mg,pri,pinned])=>{
+      const c=pinned&&CAT_BY_NAME[pinned]?CAT_BY_NAME[pinned]:autoPick(mg,used);
+      used.add(c.name);
+      return {name:c.name,mg,equip:c.equip,note:null,pri,feedback:null,_auto:!pinned};
+    });
+  })};
+  bdDay=1; await save(); render();
+  toast('Slots auto-filled — tap any to swap');
+}
+function openSwap(slotIdx){
+  swapCtx={slotIdx,mg:ST.draft.days[bdDay-1][slotIdx].mg,home:true,q:''};
+  renderSwap();
+}
+function renderSwap(){
+  const c=swapCtx;
+  const list=CATALOG.filter(x=>(c.mg==='ALL'||x.mg===c.mg)&&(!c.home||x.home)
+    &&(!c.q||x.name.toLowerCase().includes(c.q.toLowerCase())));
+  list.sort((a,b)=>a.name.localeCompare(b.name));
+  $('modalRoot').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeSwap()">
+    <div class="sheet">
+      <h2>Swap exercise</h2>
+      <div class="lib-search" style="margin:10px 0 6px"><input placeholder="Search" value="${c.q}"
+        oninput="swapCtx.q=this.value;renderSwap()"></div>
+      <div class="chiprow">
+        <button class="chip home ${c.home?'sel':''}" onclick="swapCtx.home=!swapCtx.home;renderSwap()">⌂ Home only</button>
+        <button class="chip ${c.mg==='ALL'?'sel':''}" onclick="swapCtx.mg='ALL';renderSwap()">All muscles</button>
+        ${MGS.map(m=>`<button class="chip ${c.mg===m?'sel':''}" onclick="swapCtx.mg='${m}';renderSwap()">${cap(m)}</button>`).join('')}
+      </div>
+      ${list.map(x=>{const h=ST.hist[x.name];
+        return `<button class="lib-item" onclick="doSwap('${esc(x.name)}')">
+        <span class="dot" style="background:var(--mg-${x.mg})"></span>
+        <span class="li-main"><span class="li-name">${x.name}${x.home?'':'<span class="badge-gym">GYM</span>'}</span>
+        <span class="li-sub">${cap(x.mg)} · ${x.equip}</span></span>
+        <span class="li-right">${h?`<div class="li-w">${h.w}</div>`:''}<div class="li-date">${x.last}</div></span>
+        </button>`;}).join('')}
+    </div></div>`;
+}
+function closeSwap(){ $('modalRoot').innerHTML=''; swapCtx=null; }
+async function doSwap(name){
+  const c=CAT_BY_NAME[name], slot=ST.draft.days[bdDay-1][swapCtx.slotIdx];
+  Object.assign(slot,{name:c.name,mg:c.mg,equip:c.equip,_swapped:true,_auto:false,note:null});
+  closeSwap(); await save(); render(); toast(`Swapped in ${name}`);
+}
+async function activateDraft(){
+  /* harvest history from current meso before archiving */
+  const M=ST.meso;
+  Object.keys(M.log).forEach(k=>{
+    const d=parseInt(k.split('d')[1]);
+    (M.log[k]||[]).forEach((sets,i)=>{
+      if(!sets) return;
+      const ex=M.days[d-1][i]; if(!ex) return;
+      const logged=sets.filter(s=>s.st==='logged'&&s.w);
+      if(!logged.length) return;
+      const top=Math.max(...logged.map(s=>s.w));
+      const cur=ST.hist[ex.name];
+      if(!cur||top>=cur.w) ST.hist[ex.name]={w:top,date:new Date().toISOString().slice(0,10)};
+    });
+  });
+  const D=ST.draft;
+  ST.meso={name:D.name.replace(' (draft)','')+' · '+new Date().toISOString().slice(0,10),weeks:D.weeks,curWeek:1,curDay:1,
+    days:D.days.map(day=>day.map(ex=>({name:ex.name,mg:ex.mg,equip:ex.equip,note:ex.note,pri:ex.pri??1,feedback:null}))),log:{}};
+  ST.draft=null; selWeek=1; selDay=1;
+  await ensureDay(1,1); await save();
+  view='workout'; render(); toast('New meso active — history carried forward');
+}
+
+/* ---------- engine ---------- */
+function renderEngine(){
+  $('main').innerHTML=`
+  <div class="eng-block"><h3>R1 · Rep progression</h3>
+    <p>Same weight, last week's reps <code>+1</code> per matched set. Verified vs RP exactly.</p></div>
+  <div class="eng-block"><h3>R2 · Set addition</h3>
+    <p>+1 set/exercise/week by default; new sets get weight only, worked to the week's RIR. Gated by R4/R5/R8.</p></div>
+  <div class="eng-block"><h3>R3 · Load autoregulation</h3>
+    <p>Later sets at <code>≤4 reps</code> or <code>≥3</code> below set 1 → <code>~8%</code> load cut, RIR reset. Verified: 60×4 → RP prescribed 55. Exact match.</p></div>
+  <div class="eng-block"><h3>R4 · Pain gate</h3>
+    <p>Moderate+ joint pain → rep targets held, no set added.</p></div>
+  <div class="eng-block"><h3>R5 · Workload feedback</h3>
+    <p><code>Too much</code> → hold set count. <code>Not enough</code> → +2 sets.</p></div>
+  <div class="eng-block"><h3>R6 · Missing data</h3>
+    <p>All sets skipped → same weights re-prescribed, RIR target only. Matches RP.</p></div>
+  <div class="eng-block"><h3>R7 · Deload</h3>
+    <p>Week 6: half the sets at 8 RIR.</p></div>
+  <div class="eng-block"><h3>R8 · Soreness (recovery gate)</h3>
+    <p>Asked per muscle: still sore → volume held. Never sore + low pump → strongest add signal (+2 sets).
+    'Healed just on time' is the optimum — standard progression.</p></div>
+  <div class="eng-block"><h3>Cross-meso seeding</h3>
+    <p>Exercises own their history. Returning after <code>>8 wks</code> → last load −10%; sooner → last load as-is; week 1 always works to RIR.</p></div>`;
+}
+
+/* ---------- data ---------- */
+function renderData(){
+  $('main').innerHTML=`
+  <div class="eng-block"><h3>Export</h3><p>Full state (meso + history + draft) as JSON.</p>
+    <div class="card-actions"><button onclick="doExport()">Copy JSON</button></div></div>
+  <div class="eng-block"><h3>Storage</h3>
+    <p>Persists via this app's storage. Self-hosting: swap the <code>store</code> adapter (one object, top of source).</p></div>
+  <div class="eng-block"><h3>Reset</h3><p>Restores the RP-screenshot seed. Destroys changes.</p>
+    <div class="card-actions"><button onclick="doReset()" style="color:var(--red)">Reset to seed</button></div></div>`;
+}
+async function doExport(){
+  try{ await navigator.clipboard.writeText(JSON.stringify(ST,null,1)); toast('Copied'); }
+  catch(e){ toast('Clipboard blocked — see console'); console.log(JSON.stringify(ST)); }
+}
+async function doReset(){
+  ST=seedState(); selWeek=ST.meso.curWeek; selDay=ST.meso.curDay;
+  await ensureDay(selWeek,selDay); await save(); view='workout'; render(); toast('Reset');
+}
+init();
+</script>
+</body>
+</html>
