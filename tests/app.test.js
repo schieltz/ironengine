@@ -457,3 +457,34 @@ describe('cross-meso history = last top set, real dates (S1)', () => {
     assert.equal(bare.state().hist['EZ Bar Curl (Normal Grip)'].date, null);
   });
 });
+
+describe('app opens where you left off (S2)', () => {
+  test('mid-session: reopens on that session', async () => {
+    const app = await bootApp({ now: NOW });
+    assert.deepEqual([app.run('selWeek'), app.run('selDay')], [2, 3]);
+  });
+
+  test('finished session: reopens on the next one', async () => {
+    const ls = fakeLocalStorage();
+    const a = await bootApp({ now: NOW, localStorage: ls });
+    await a.call('for (let i=0;i<8;i++) await skipRest(i);');
+    const b = await bootApp({ now: NOW, localStorage: ls });
+    assert.deepEqual([b.run('selWeek'), b.run('selDay')], [3, 1]);
+  });
+
+  test('browsing ahead does not move the resume point', async () => {
+    const ls = fakeLocalStorage();
+    const a = await bootApp({ now: NOW, localStorage: ls });
+    await a.call('await pickWeek(5); await pickDay(1);');
+    const b = await bootApp({ now: NOW, localStorage: ls });
+    assert.deepEqual([b.run('selWeek'), b.run('selDay')], [2, 3]);
+  });
+
+  test('new meso opens on week 1 day 1', async () => {
+    const ls = fakeLocalStorage();
+    const a = await bootApp({ now: NOW, localStorage: ls, confirm: () => true });
+    await a.call('await makeDraft(); await activateDraft();');
+    const b = await bootApp({ now: NOW, localStorage: ls });
+    assert.deepEqual([b.run('selWeek'), b.run('selDay')], [1, 1]);
+  });
+});

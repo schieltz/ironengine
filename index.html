@@ -520,11 +520,25 @@ async function init(){
     catch(error){ loadError={error,raw:r.raw}; }
   }
   ST=saved||seedState();
-  selWeek=ST.meso.curWeek; selDay=ST.meso.curDay;
+  ({w:selWeek,d:selDay}=resumePoint());
+  ST.meso.curWeek=selWeek; ST.meso.curDay=selDay;
   await ensureDay(selWeek,selDay);
   if(upgrading) await save();
   render();
   if(loadError) renderLoadError();
+}
+/* Where the app opens: the latest session with anything logged or skipped, or the one after it
+   once it's finished. Nothing logged yet → week 1 day 1. */
+function resumePoint(){
+  const M=ST.meso, weeks=RIR_RAMP.length+1, n=DAYS.length;
+  let last=null;
+  for(let w=1;w<=weeks;w++) for(let d=1;d<=n;d++)
+    if((M.log[key(w,d)]||[]).some(sets=>(sets||[]).some(s=>s.st))) last={w,d};
+  if(!last) return {w:1,d:1};
+  const log=M.log[key(last.w,last.d)], exs=M.days[last.d-1];
+  const finished=exs.every((_,i)=>log[i]&&log[i].every(s=>s.st));
+  if(!finished || (last.w===weeks && last.d===n)) return last;
+  return last.d<n ? {w:last.w,d:last.d+1} : {w:last.w+1,d:1};
 }
 async function save(){
   if(loadError) return;   /* never write over data we couldn't read */
