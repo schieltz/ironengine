@@ -58,6 +58,7 @@ RIR ramp: 3/2/2/1/0 + deload 8. Days: Mon/Wed/Fri.
 
 ## Known gaps / roadmap candidates
 - R2/R5/R8 coefficients unvalidated — owner is parallel-logging in RP for one meso to calibrate; expect tuning PRs
+- Builder can only swap exercises within existing slots: no add/remove/reorder slots, no priority toggle. To mirror an RP meso, start both apps from the same template
 - No rep-range targets per exercise type (RP likely varies floor by compound/isolation)
 - History stores top set only; consider full set-level history + e1RM trend
 - No multi-meso archive browsing UI (full mesos are kept in `ST.archive` and in backups)
