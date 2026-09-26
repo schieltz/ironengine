@@ -122,6 +122,14 @@ nav button.active{color:var(--blue)}
 .lib-item .li-right{text-align:right;flex:0 0 auto}
 .lib-item .li-w{font-size:14px;font-weight:800;color:var(--blue)}
 .lib-item .li-date{font-size:10.5px;color:var(--ink-faint)}
+.badge-mine{font-size:9px;font-weight:800;letter-spacing:.6px;background:#1B2A33;color:#7FB2D9;
+  border-radius:5px;padding:2px 6px;margin-left:6px;vertical-align:middle}
+.form-label{font-size:13px;font-weight:700;color:var(--ink-dim);margin:16px 0 8px}
+.form-input{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;
+  font-size:16px;color:var(--ink);min-height:44px}
+.form-input:focus{outline:none;border-color:var(--blue)}
+.chip-wrap{display:flex;flex-wrap:wrap;gap:6px}
+.form-err{color:var(--red);font-size:13px;margin-top:8px;min-height:18px}
 .badge-gym{font-size:9px;font-weight:800;letter-spacing:.6px;background:#33231B;color:#C98B5C;
   border-radius:5px;padding:2px 6px;margin-left:6px;vertical-align:middle}
 /* builder */
@@ -324,8 +332,9 @@ const CATALOG=[
 CATALOG.forEach(c=>c.home=isHome(c));
 const CAT_BY_NAME=Object.fromEntries(CATALOG.map(c=>[c.name,c]));
 /* the exercise library the UI offers: built-in catalog (custom exercises join here) */
-const libAll=()=>CATALOG;
-const libByName=name=>CAT_BY_NAME[name];
+const libAll=()=>ST&&ST.custom?CATALOG.concat(ST.custom):CATALOG;
+const libByName=name=>CAT_BY_NAME[name]||(ST&&ST.custom||[]).find(c=>c.name===name);
+const EQUIP=['Barbell','Dumbbell','Cable','Machine','Smith Machine','Bodyweight Only','Bodyweight Loadable','Other'];
 
 /* ---------- meso template library (from RP Templates tab) ----------
    slot: [MG, pri] — pri 1 = full priority (start 2 sets), 0 = maintenance (start 1 set)
@@ -391,14 +400,14 @@ function seedState(){
     'Romanian Deadlift':{w:175,date:'2026-07-06'},'Bench Press (Medium Grip)':{w:175,date:'2026-07-06'},
     'Barbell Bent Over Row':{w:120,date:'2026-07-04'},
   };
-  return {v:SCHEMA_VERSION,meso,hist,draft:null,archive:[]};
+  return {v:SCHEMA_VERSION,meso,hist,draft:null,archive:[],custom:[]};
 }
 
 /* ---------- state schema ----------
    Saved state carries v; unversioned saves are v1. To change the stored shape:
    bump SCHEMA_VERSION, append the upgrade step to MIGRATIONS, update seedState(),
    and add a migration test. */
-const SCHEMA_VERSION=5;
+const SCHEMA_VERSION=6;
 const MIGRATIONS=[   /* MIGRATIONS[n-1] upgrades a v(n) state to v(n+1), in place */
   /* v1→v2: feedback moves off the exercise (where it applied to every later week) into
      meso.fb[session][exercise]. A legacy answer is attributed to the latest week of that
@@ -448,6 +457,8 @@ const MIGRATIONS=[   /* MIGRATIONS[n-1] upgrades a v(n) state to v(n+1), in plac
     conv(s.meso);
     (s.archive||[]).forEach(m=>{ if(m&&m.days&&m.log) conv(m); });
   },
+  /* v5→v6: exercises you create live in ST.custom and join the built-in catalog */
+  s=>{ s.custom=s.custom||[]; },
 ];
 function migrate(s){
   let v=s.v||1;
@@ -701,7 +712,7 @@ function renderHeader(){
   const titles={workout:`WEEK ${selWeek} <span class="dim">DAY ${selDay}</span>`,library:'LIBRARY',
     builder:'MESO BUILDER',engine:'THE ENGINE',data:'DATA'};
   const subs={workout:`${DAYS[selDay-1]} · ${M.name} · target ${rirFor(selWeek)} RIR`,
-    library:`${CATALOG.length} performed exercises · tap for history`,
+    library:`${libAll().length} exercises · ${ST.custom.length} of them yours`,
     builder: ST.draft?`Draft: ${ST.draft.name}`:'Plan your next mesocycle',
     engine:'Every number, explained. No black box.',data:'Export, reset, storage'};
   $('hTitle').innerHTML=titles[view]; $('hSub').textContent=subs[view];
@@ -744,9 +755,9 @@ function renderWorkout(){
     const why=e.why?`<div class="why">→ ${e.why}</div>`:'';
     html+=`<div class="card">
       <div class="ex-name">${e.name}</div>
-      <div class="ex-meta">${ex.equip}${CAT_BY_NAME[e.name]&&!CAT_BY_NAME[e.name].home?'<span class="badge-gym">GYM</span>':''}
+      <div class="ex-meta">${ex.equip}${libByName(e.name)&&!libByName(e.name).home?'<span class="badge-gym">GYM</span>':''}
         ${slot&&!own?` · swapped in today for ${slot.name}`:''}</div>
-      ${own&&slot.note?`<div class="ex-note">📌 ${slot.note}</div>`:''}
+      ${own&&slot.note?`<div class="ex-note">📌 ${escHtml(slot.note)}</div>`:''}
       <div class="set-head"><span></span><span>WEIGHT</span><span>REPS</span><span>LOG</span></div>
       ${sets.map((s,j)=>setRow(i,j,s)).join('')}
       ${why}
@@ -856,6 +867,7 @@ function renderLibrary(){
       <button class="chip ${libMg==='ALL'?'sel':''}" onclick="libMg='ALL';renderLibrary()">All</button>
       ${MGS.map(m=>`<button class="chip ${libMg===m?'sel':''}" onclick="libMg='${m}';renderLibrary()">${cap(m)}</button>`).join('')}
     </div>
+    <button class="bigbtn ghost" onclick="openNewEx(null)">+ New exercise</button>
     <div id="libList"></div>`;
   renderLibraryList();
 }
@@ -868,9 +880,10 @@ function renderLibraryList(){
   $('libList').innerHTML=`
     ${list.map(c=>{
       const h=ST.hist[c.name];
-      return `<button class="lib-item" onclick="toast('${esc(c.name)}${c.last?' — last: '+c.last:''}${h?' @ '+h.w:''}')">
+      return `<button class="lib-item" onclick="${c.custom?`openCustomMenu('${esc(c.name)}')`
+          :`toast('${esc(c.name)}${c.last?' — last: '+c.last:''}${h?' @ '+h.w:''}')`}">
         <span class="dot" style="background:var(--mg-${c.mg})"></span>
-        <span class="li-main"><span class="li-name">${c.name}${c.home?'':'<span class="badge-gym">GYM</span>'}</span>
+        <span class="li-main"><span class="li-name">${c.name}${c.custom?'<span class="badge-mine">MINE</span>':''}${c.home?'':'<span class="badge-gym">GYM</span>'}</span>
         <span class="li-sub">${cap(c.mg)} · ${c.equip}</span></span>
         <span class="li-right">${h?`<div class="li-w">${h.w}</div>`:''}<div class="li-date">${c.last||''}</div></span>
       </button>`;}).join('')||'<p style="color:var(--ink-faint);padding:20px;text-align:center">No matches</p>'}`;
@@ -956,6 +969,7 @@ function renderSwap(){
         <button class="chip ${c.mg==='ALL'?'sel':''}" onclick="swapCtx.mg='ALL';renderSwap()">All muscles</button>
         ${MGS.map(m=>`<button class="chip ${c.mg===m?'sel':''}" onclick="swapCtx.mg='${m}';renderSwap()">${cap(m)}</button>`).join('')}
       </div>
+      <button class="bigbtn ghost" style="margin:4px 0 8px;width:100%" onclick="openNewEx(swapCtx)">+ New exercise</button>
       <div id="swapList"></div>
     </div></div>`;
   renderSwapList();
@@ -968,7 +982,7 @@ function renderSwapList(){
   $('swapList').innerHTML=list.map(x=>{const h=ST.hist[x.name];
     return `<button class="lib-item" onclick="doSwap('${esc(x.name)}')">
     <span class="dot" style="background:var(--mg-${x.mg})"></span>
-    <span class="li-main"><span class="li-name">${x.name}${x.home?'':'<span class="badge-gym">GYM</span>'}</span>
+    <span class="li-main"><span class="li-name">${x.name}${x.custom?'<span class="badge-mine">MINE</span>':''}${x.home?'':'<span class="badge-gym">GYM</span>'}</span>
     <span class="li-sub">${cap(x.mg)} · ${x.equip}</span></span>
     <span class="li-right">${h?`<div class="li-w">${h.w}</div>`:''}<div class="li-date">${x.last||''}</div></span>
     </button>`;}).join('')||'<p style="color:var(--ink-faint);padding:20px;text-align:center">No matches</p>';
@@ -983,11 +997,12 @@ async function doSwap(name){
 
 /* ---------- exercise menu + swap in the active meso ---------- */
 function openExMenu(ei){
-  const e=entryAt(ei);
+  const e=entryAt(ei), slot=slotOf(selDay,e), own=slot&&slot.name===e.name;
   $('modalRoot').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeSwap()"><div class="sheet">
     <h2>${e.name}</h2>
     <div class="sheet-stack">
       <button class="btn-ghost" onclick="openEntrySwap(${ei})">Swap exercise</button>
+      ${own?`<button class="btn-ghost" onclick="editNote(${ei})">${slot.note?'Edit note':'Add note'}</button>`:''}
       <button class="btn-ghost" onclick="closeSwap()">Cancel</button>
     </div></div></div>`;
 }
@@ -1011,6 +1026,85 @@ function chooseSwapScope(name){
       :`Just today: next week goes back to ${e.name}. Rest of meso: ${name} replaces it from today on.`}</p>
   </div></div>`;
 }
+/* A note belongs to the plan slot, so it shows every week this exercise is done in that slot. */
+async function editNote(ei){
+  const slot=slotOf(selDay,entryAt(ei));
+  const v=prompt(`Note for ${slot.name} (leave empty to remove)`,slot.note||'');
+  if(v===null) return;
+  slot.note=v.trim().slice(0,120)||null;
+  closeSwap(); await save(); render();
+}
+
+/* ---------- your own exercises ----------
+   Stored in ST.custom and offered everywhere the built-in catalog is. Names are permanent (history is
+   keyed by name) and can't contain " < > \ so they stay safe inside the page markup. */
+let newEx=null;
+function openNewEx(from){
+  const mg=from&&from.mg&&from.mg!=='ALL'?from.mg:null;
+  newEx={name:'',mg,equip:null,home:null,err:'',from:from?{...from}:null};
+  renderNewEx();
+}
+function renderNewEx(){
+  const n=newEx, home=n.home??(n.equip?isHome({name:n.name,equip:n.equip}):null);
+  const chips=(field,vals,lbl)=>vals.map(v=>`<button class="chip ${n[field]===v?'sel':''}"
+    onclick="newEx.${field}='${v}';renderNewEx()">${lbl(v)}</button>`).join('');
+  $('modalRoot').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeNewEx()"><div class="sheet">
+    <h2>New exercise</h2>
+    <div class="form-label">Name</div>
+    <input class="form-input" id="newExName" maxlength="60" autocapitalize="words" placeholder="e.g. Cable Row (Wide Grip)"
+      value="${escHtml(n.name)}" oninput="newEx.name=this.value">
+    <div class="form-label">Muscle group</div><div class="chip-wrap">${chips('mg',MGS,cap)}</div>
+    <div class="form-label">Equipment</div><div class="chip-wrap">${chips('equip',EQUIP,v=>v)}</div>
+    <div class="form-label">Can you do it at home?</div><div class="chip-wrap">
+      <button class="chip home ${home===true?'sel':''}" onclick="newEx.home=true;renderNewEx()">⌂ Yes</button>
+      <button class="chip ${home===false?'sel':''}" onclick="newEx.home=false;renderNewEx()">Gym only</button></div>
+    <div class="form-err">${escHtml(n.err)}</div>
+    <div class="sheet-actions">
+      <button class="btn-ghost" onclick="closeNewEx()">Cancel</button>
+      <button class="btn-primary" onclick="saveNewEx()">Save</button>
+    </div></div></div>`;
+}
+function newExError(n){
+  const name=n.name.trim();
+  if(!name) return 'Give it a name.';
+  if(/["<>\\]/.test(name)) return 'Names can\'t contain " < > or \\.';
+  if(libAll().some(c=>c.name.toLowerCase()===name.toLowerCase())) return 'That name is already in the library.';
+  if(!n.mg) return 'Pick a muscle group.';
+  if(!n.equip) return 'Pick the equipment.';
+  return '';
+}
+async function saveNewEx(){
+  const n=newEx; n.err=newExError(n);
+  if(n.err){ renderNewEx(); return; }
+  const name=n.name.trim();
+  ST.custom.push({name,mg:n.mg,equip:n.equip,home:n.home??isHome({name,equip:n.equip}),last:null,custom:true});
+  await save(); toast(`${name} added to your library`);
+  const from=n.from; newEx=null;
+  if(from){ swapCtx=from; return doSwap(name); }   /* created from the picker: carry on with it */
+  $('modalRoot').innerHTML=''; render();
+}
+function closeNewEx(){
+  const from=newEx&&newEx.from; newEx=null;
+  if(from){ swapCtx=from; renderSwap(); } else $('modalRoot').innerHTML='';
+}
+const inUse=name=>ST.meso.days.flat().some(s=>s.name===name)
+  ||Object.values(ST.meso.log).some(es=>es.some(e=>e.name===name))
+  ||!!(ST.draft&&ST.draft.days.flat().some(s=>s.name===name));
+function openCustomMenu(name){
+  $('modalRoot').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeSwap()"><div class="sheet">
+    <h2>${name}</h2><p class="sheet-p">Your exercise.${ST.hist[name]?` Last top set ${ST.hist[name].w}.`:''}</p>
+    <div class="sheet-stack">
+      <button class="btn-ghost" style="color:var(--red)" onclick="deleteCustom('${esc(name)}')">Delete from library</button>
+      <button class="btn-ghost" onclick="closeSwap()">Cancel</button>
+    </div></div></div>`;
+}
+async function deleteCustom(name){
+  if(inUse(name)){ toast('In use in your current meso or draft, so it stays'); return; }
+  if(!confirm(`Delete ${name} from your library? Past history keeps its name.`)) return;
+  ST.custom=ST.custom.filter(c=>c.name!==name);
+  closeSwap(); await save(); render();
+}
+
 /* scope 'today': only this session's entry changes (frozen with u so the plan can't revert it).
    scope 'meso': the plan slot changes too, so every later session follows. Sets already logged
    today are never replaced. The new exercise is seeded by prescribeEntry(). */

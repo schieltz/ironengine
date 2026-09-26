@@ -616,3 +616,76 @@ describe('swap an exercise mid-meso (Phase 2)', () => {
     assert.doesNotMatch(app.els.get('swapList').innerHTML, /Pullup/);
   });
 });
+
+describe('your own exercises and notes (Phase 3)', () => {
+  const create = (app, f) => app.call(`openNewEx(null); Object.assign(newEx, ${JSON.stringify(f)}); await saveNewEx();`);
+  const MACHINE_ROW = { name: 'Rogue Row Machine', mg: 'BACK', equip: 'Machine' };
+
+  test('create an exercise: it joins the library, marked as yours, gym-only by equipment', async () => {
+    const app = await bootApp({ now: NOW });
+    await create(app, MACHINE_ROW);
+    const c = app.state().custom[0];
+    assert.deepEqual(c, { ...MACHINE_ROW, home: false, last: null, custom: true });
+    await app.call("setView('library'); libHome=false; renderLibrary();");
+    assert.match(app.els.get('libList').innerHTML, /Rogue Row Machine<span class="badge-mine">MINE/);
+  });
+
+  test('home answer overrides the equipment default', async () => {
+    const app = await bootApp({ now: NOW });
+    await create(app, { ...MACHINE_ROW, home: true });
+    assert.equal(app.state().custom[0].home, true);
+  });
+
+  for (const [label, f, err] of [
+    ['a duplicate of a built-in (any case)', { name: 'pulldown (normal grip)', mg: 'BACK', equip: 'Cable' }, /already in the library/],
+    ['unsafe characters', { name: 'Row <b>', mg: 'BACK', equip: 'Cable' }, /can't contain/],
+    ['no muscle group', { name: 'Thing', equip: 'Cable' }, /muscle group/],
+  ]) {
+    test(`rejects ${label}`, async () => {
+      const app = await bootApp({ now: NOW });
+      await create(app, f);
+      assert.deepEqual(app.state().custom, []);
+      assert.match(app.run('newEx.err'), err);
+    });
+  }
+
+  test('created from the swap picker, it carries straight on to the swap', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('openEntrySwap(5); openNewEx(swapCtx);');
+    assert.equal(app.run('newEx.mg'), 'BACK');                        // picker's muscle group carried over
+    await app.call(`Object.assign(newEx, ${JSON.stringify(MACHINE_ROW)}); await saveNewEx();`);
+    assert.match(app.els.get('modalRoot').innerHTML, /Barbell Bent Over Row → <b>Rogue Row Machine/);
+    await app.call('await swapEntry(5,"Rogue Row Machine","today");');
+    assert.equal(app.state().meso.log.w2d3[5].name, 'Rogue Row Machine');
+    assert.match(app.els.get('main').innerHTML, /Machine<span class="badge-gym">GYM<\/span>\s+· swapped in today/);
+  });
+
+  test('delete: allowed when unused, blocked while in the current meso', async () => {
+    const app = await bootApp({ now: NOW, confirm: () => true });
+    await create(app, MACHINE_ROW);
+    await create(app, { ...MACHINE_ROW, name: 'Spare Row' });
+    await app.call('await swapEntry(5,"Rogue Row Machine","meso");');
+    await app.call('await deleteCustom("Rogue Row Machine"); await deleteCustom("Spare Row");');
+    assert.deepEqual(app.state().custom.map(c => c.name), ['Rogue Row Machine']);
+  });
+
+  test('notes: set on the plan slot, shown every week, rendered as text', async () => {
+    let answer = 'Pause 1s <b>at top</b>';
+    const app = await bootApp({ now: NOW, prompt: () => answer });
+    await app.call('await editNote(3);');
+    assert.equal(app.state().meso.days[2][3].note, 'Pause 1s <b>at top</b>');
+    assert.match(app.els.get('main').innerHTML, /📌 Pause 1s &lt;b&gt;at top&lt;\/b&gt;/);
+    await app.call('await pickWeek(3);');
+    assert.match(app.els.get('main').innerHTML, /📌 Pause 1s/);
+    answer = '';
+    await app.call('await editNote(3);');
+    assert.equal(app.state().meso.days[2][3].note, null);
+  });
+
+  test('v5 saves upgrade with an empty custom library', async () => {
+    const ls = fakeLocalStorage();
+    ls.data.set('ironengine:state2', JSON.stringify(v4State()));
+    const app = await bootApp({ now: NOW, localStorage: ls });
+    assert.deepEqual(app.state().custom, []);
+  });
+});

@@ -9,10 +9,12 @@ Live: https://schieltz.github.io/ironengine/
 1. **Storage adapter** (`store`, top of script): mode picked once at startup: `claude` (window.storage) → `local` (localStorage, `ironengine:` prefix, only when window.storage is absent) → `memory`. `get()` distinguishes "nothing saved" from "read failed"; a failed read or unparseable/newer-version data blocks all saves and shows a recovery sheet (Retry / Copy raw / Start fresh, which backs the raw data up to `state2.unreadable-<ts>` first). Failed writes and memory mode show a persistent banner. Swap here for any new backend.
 2. **Pure-function engine**, delimited by `@engine:begin` / `@engine:end` comments: `RULES` (every tunable coefficient), `RIR_RAMP`, `DELOAD_RIR`, `rirFor()`, `prescribe()`, `startingSets()`, `roundLoad()`, `weeksSince()`. No DOM, storage, or app state (enforced by a test). Calibration = change a `RULES` value + add a test; the Engine tab renders from `RULES`, so its text can't drift.
 3. **UI**: five views (Workout / Library / Builder / Engine / Data), string-template rendering, no framework.
+   - Notes belong to the plan slot (shown every week the slot does that exercise); set from the exercise menu, rendered escaped.
+   - "+ New exercise" (Library and picker) creates a custom exercise; from the picker it continues straight into the swap/add.
    - Each workout card has an exercise menu (⋯). Swap opens the shared exercise picker (same muscle group and home filter preselected; search re-renders only the list so the phone keyboard stays open), then asks: **Just today** (only this session's entry changes, frozen with `u`; next week the slot returns to the original, as a missed week, R6) or **Rest of meso** (the plan slot changes; sets already logged today are kept). A swapped-in exercise is seeded from history, including this meso's earlier sessions, with the slot's last set count.
 
 ## Data model
-- Saved state `{v, meso, hist, draft, archive}` under key `state2`. `v` = schema version; unversioned saves are v1. Changing the stored shape = bump `SCHEMA_VERSION`, append a step to `MIGRATIONS`, update `seedState()`, add a migration test. `migrate()` runs on load; upgraded state is saved immediately.
+- Saved state `{v, meso, hist, draft, archive, custom}` under key `state2`. `v` = schema version; unversioned saves are v1. Changing the stored shape = bump `SCHEMA_VERSION`, append a step to `MIGRATIONS`, update `seedState()`, add a migration test. `migrate()` runs on load; upgraded state is saved immediately.
 - `ST.meso`: {name, weeks, curWeek, curDay, days[3][slots], seq, log{wNdM: [entries]}, dates{wNdM: date}}
 - slot (the plan for sessions not yet started): {id, name, mg, equip, note, pri}. `id` is permanent within the meso (`s1`, `s2`, … from `seq`).
 - entry (one exercise in one session, display order): {slot, name, sets, why, fb, u?}. `name` can differ from the slot's (a one-off swap). `fb` = feedback given in that session {soreness, pain, pump, workload}; it shapes only the next week's prescription for that slot. `u` = entry-level touch (swapped or added by hand). v5; before that, sessions were arrays lined up with the plan by position.
@@ -23,7 +25,8 @@ Live: https://schieltz.github.io/ironengine/
 - `ST.meso.dates`: session → local date its first set was logged (v4). Undated legacy sessions borrow the meso's latest known date at harvest.
 - `ST.draft`: meso under construction in Builder
 - `ST.archive`: finished mesos, kept whole (every set) with `archivedAt` when a draft is activated (v3). No browsing UI yet; included in backups.
-- `CATALOG`: 98 exercises (owner's performed list from RP), each {name, mg, equip, last, home}
+- `CATALOG`: 98 built-in exercises (owner's performed list from RP), each {name, mg, equip, last, home}
+- `ST.custom`: exercises the owner creates, {name, mg, equip, home, last: null, custom: true} (v6). `libAll()` / `libByName()` = catalog + custom; everything the UI offers goes through them. Names are permanent (history is keyed by name) and can't contain `" < > \\`. A custom exercise can be deleted only while unused in the current meso and draft.
 - `TEMPLATES`: 6 RP meso blueprints; slots [MG, priority, optionalPinnedExercise]
 
 ## Engine rules (R1–R8)

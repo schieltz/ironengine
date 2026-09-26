@@ -106,8 +106,8 @@ function fakeLocalStorage() {
 
 /* Boots the full app script. `windowStorage` simulates the Claude artifact API;
    `localStorage` simulates a browser. Omit both for the in-memory fallback.
-   `confirm` answers window.confirm(); by default any confirm() call fails the test. */
-async function bootApp({ now = Date.now(), windowStorage, localStorage, confirm } = {}) {
+   `confirm` / `prompt` answer window.confirm() / prompt(); by default calling either fails the test. */
+async function bootApp({ now = Date.now(), windowStorage, localStorage, confirm, prompt } = {}) {
   const els = new Map();
   const document = {
     getElementById(id) {
@@ -123,6 +123,10 @@ async function bootApp({ now = Date.now(), windowStorage, localStorage, confirm 
       confirms.push(msg);
       if (!confirm) throw new Error(`unexpected confirm(): ${msg}`);
       return confirm(msg);
+    },
+    prompt: (msg, def) => {
+      if (!prompt) throw new Error(`unexpected prompt(): ${msg}`);
+      return prompt(msg, def);
     },
   };
   sandbox.window = sandbox;
