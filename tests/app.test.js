@@ -748,8 +748,7 @@ describe('change a day\'s exercises (Phase 5)', () => {
     const app = await bootApp({ now: NOW });
     await app.call('await addEntry("Hammer Curl","today");');
     let st = app.state();
-    const e = st.meso.log.w2d3.at(-1);
-    assert.equal(e.name, 'Hammer Curl');
+    const e = st.meso.log.w2d3.find(x => x.name === 'Hammer Curl');
     assert.equal(e.u, 1);
     assert.ok(e.sets.length === 2 && e.sets.every(s => s.w === 20), JSON.stringify(e.sets)); // Wed w2: 20x8,7,7
     assert.ok(!planNames(st, 3).includes('Hammer Curl'));
@@ -760,12 +759,12 @@ describe('change a day\'s exercises (Phase 5)', () => {
   test('add to the plan: in later weeks and progressing from today', async () => {
     const app = await bootApp({ now: NOW });
     await app.call('await addEntry("Hammer Curl","meso");');
-    const i = app.state().meso.log.w2d3.length - 1;
+    const i = app.state().meso.log.w2d3.findIndex(x => x.name === 'Hammer Curl');
     await app.call(`for (const j of [0,1]) { await upd(${i},j,"w","25"); await upd(${i},j,"reps","12"); await tapLog(${i},j); }`);
     await app.call('await pickWeek(3);');
     const st = app.state(), e = st.meso.log.w3d3.find(x => x.name === 'Hammer Curl');
     assert.deepEqual(e.sets, [target(25, 13), target(25, 13), rirOnly(25, 2)]);
-    assert.equal(planNames(st, 3).at(-1), 'Hammer Curl');
+    assert.ok(planNames(st, 3).includes('Hammer Curl'));
   });
 
   test('"+ Add exercise" opens the picker across all muscles', async () => {
@@ -788,7 +787,7 @@ describe('change a day\'s exercises (Phase 5)', () => {
       await activateDraft();`);
     const st = app.state(), mon = st.meso.days[0];
     assert.deepEqual(mon.map(s => s.name), ['Cable Triceps Pushdown (Bar)', 'Dip (Weighted, Triceps-Focused)',
-      'Cable Upright Row', 'Cable Curl', 'Bench Press (Medium Grip)', 'Hammer Curl']);
+      'Cable Upright Row', 'Cable Curl', 'Hammer Curl', 'Bench Press (Medium Grip)']);   // curl joins the biceps
     assert.equal(mon[0].pri, 0);
     assert.equal(mon[1].note, 'Slow eccentric');
     assert.equal(new Set(st.meso.days.flat().map(s => s.id)).size, st.meso.days.flat().length);
@@ -867,5 +866,31 @@ describe('remove sets (#2)', () => {
     const app = await bootApp({ now: NOW });
     await app.call('await removeSet(3); await tapLog(3,0); await tapLog(3,1); await pickWeek(3);');
     assert.deepEqual(app.state().meso.log.w3d3[3].sets, [target(120, 12), target(120, 11), rirOnly(120, 2)]);
+  });
+});
+
+describe('added exercises join their muscle group (#3)', () => {
+  const names = (st, k) => st.meso.log[k].map(e => e.name);
+
+  test('a shoulder exercise lands after the last shoulder exercise, today and in the plan', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('await addEntry("Arnold Press","meso");');
+    const st = app.state();
+    assert.deepEqual(names(st, 'w2d3').slice(0, 3), ['Dumbbell Lateral Raise', 'Cable Upright Row', 'Arnold Press']);
+    assert.equal(st.meso.days[2][2].name, 'Arnold Press');
+    await app.call('await pickWeek(3);');
+    assert.equal(names(app.state(), 'w3d3')[2], 'Arnold Press');
+  });
+
+  test('"just today" joins the group too', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('await addEntry("Pulldown (Parallel Grip)","today");');
+    assert.deepEqual(names(app.state(), 'w2d3').slice(5, 8), ['Barbell Bent Over Row', 'Deadlift', 'Pulldown (Parallel Grip)']);
+  });
+
+  test('a group the day doesn\'t have goes at the end', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('await addEntry("Dumbbell Shrug","today");');
+    assert.equal(names(app.state(), 'w2d3').at(-1), 'Dumbbell Shrug');
   });
 });

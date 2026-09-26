@@ -1239,11 +1239,15 @@ function chooseAddScope(name){
 }
 /* 'today': an extra entry in this session only (frozen with u). 'meso': a new plan slot, so every later
    session gets it too. Either way it gets its own slot id and is seeded by prescribeEntry(). */
+/* New exercises land right after the last one of the same muscle group (or at the end if the day has
+   none), so they join that group's block of cards. */
+const afterGroup=(items,mgOf,mg)=>{ let at=items.length; items.forEach((x,i)=>{ if(mgOf(x)===mg) at=i+1; }); return at; };
 async function addEntry(name,scope){
   const M=ST.meso, c=libByName(name), id='s'+(++M.seq), e={slot:id,name:c.name,sets:null};
-  if(scope==='meso') M.days[selDay-1].push({id,name:c.name,mg:c.mg,equip:c.equip,note:null,pri:1});
+  const plan=M.days[selDay-1], log=M.log[key(selWeek,selDay)];
+  if(scope==='meso') plan.splice(afterGroup(plan,s=>s.mg,c.mg),0,{id,name:c.name,mg:c.mg,equip:c.equip,note:null,pri:1});
   else e.u=1;
-  M.log[key(selWeek,selDay)].push(e);
+  log.splice(afterGroup(log,x=>exInfo(x.name,slotOf(selDay,x)).mg,c.mg),0,e);
   const p=prescribeEntry(selWeek,selDay,e); e.sets=p.sets; e.why=p.why;
   closeSwap(); await ensureDay(selWeek,selDay); await save(); render();
   toast(scope==='today'?`${c.name} added for today`:`${c.name} added to ${DAYS[selDay-1]}`);
@@ -1375,7 +1379,8 @@ async function editDraftNote(i){
 function openDraftAdd(){ swapCtx={mode:'draftAdd',mg:'ALL',home:true,q:'',exclude:null}; renderSwap(); }
 async function draftAdd(name){
   const c=libByName(name);
-  ST.draft.days[bdDay-1].push({name:c.name,mg:c.mg,equip:c.equip,note:null,pri:1,_swapped:true});
+  const a=ST.draft.days[bdDay-1];
+  a.splice(afterGroup(a,s=>s.mg,c.mg),0,{name:c.name,mg:c.mg,equip:c.equip,note:null,pri:1,_swapped:true});
   closeSwap(); await save(); render(); toast(`${c.name} added to ${DAYS[bdDay-1]}`);
 }
 async function discardDraft(){
