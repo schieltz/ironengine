@@ -65,6 +65,8 @@ RIR ramp: 3/2/2/1/0 + deload 8. Days: Mon/Wed/Fri.
 5. Situations worth catching (they settle open questions): an exercise skipped entirely (R6 set count); a later set at ≤4 reps (R3 floor); a later set 3+ reps below set 1 but above 4 (R3 drop trigger); a manually added set (R2 interaction); each feedback extreme (moderate pain, still sore, too much, not enough, never sore + low pump); every deload day.
 
 ## Known gaps / roadmap candidates
+- Library expansion: 125 exercises drafted (RP-style names; 112 across the existing groups plus optional new TRAPS and ABS groups), awaiting owner review at https://claude.ai/artifact/BXzXRRu92F4aBjGEfnLJzq (decisions saved to its db doc `review/library-draft`). Merge = add the kept names to `CATALOG` (`last: null`), extend `HOME_MACHINES` with 'Leg Extension (Single Leg)' and 'Seated Leg Curl (Single Leg)', and add TRAPS/ABS to `MGS` plus a `--mg-ABS` color if approved
+- Exercise detail view (tap an exercise → every past session from the current meso and `ST.archive`) not built yet
 - R2/R5/R8 coefficients unvalidated — owner is parallel-logging in RP for one meso to calibrate; expect tuning PRs
 - No rep-range targets per exercise type (RP likely varies floor by compound/isolation)
 - History stores top set only; consider full set-level history + e1RM trend
