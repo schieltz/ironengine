@@ -2,6 +2,14 @@
 const { describe, test } = require('node:test');
 const assert = require('node:assert/strict');
 const { bootApp, fakeLocalStorage } = require('./harness');
+const V4_FIXTURE = require('./fixtures/state-v4.json');   // real saved state from schema v4
+const v4State = () => structuredClone(V4_FIXTURE);
+/* v1-shaped save: the v4 fixture minus everything later versions added */
+const v1State = () => {
+  const s = v4State();
+  delete s.v; delete s.archive; delete s.meso.fb; delete s.meso.dates;
+  return s;
+};
 
 const NOW = Date.parse('2026-09-25T12:00:00Z');
 const target = (w, tgt) => ({ w, tgt, rir: null, st: null, reps: null });
@@ -38,7 +46,7 @@ describe('VERIFIED fixtures through the real ensureDay() path on the seed (w1d3 
     const app = await bootApp({ now: NOW });
     const st = app.state();
     const day = st.meso.days[2].map(e => e.name);
-    const w2d3 = st.meso.log.w2d3;
+    const w2d3 = st.meso.log.w2d3.map(e => e.sets);
 
     assert.equal(day[3], 'Bench Press (Close Grip)');
     assert.deepEqual(w2d3[3], [target(120, 11), target(120, 10), rirOnly(120, 2)]);
@@ -55,7 +63,7 @@ describe('VERIFIED fixtures through the real ensureDay() path on the seed (w1d3 
   test('each prescribed exercise has a stored "why"', async () => {
     const app = await bootApp({ now: NOW });
     const st = app.state();
-    for (const i of [3, 4, 5, 6, 7]) assert.ok(st.meso.days[2][i]._why.w2d3.length > 10);
+    for (const i of [3, 4, 5, 6, 7]) assert.ok(st.meso.log.w2d3[i].why.length > 10);
   });
 });
 
@@ -100,9 +108,7 @@ describe('state schema', () => {
 
   test('unversioned (legacy) save loads intact and is re-saved with a version', async () => {
     const ls = fakeLocalStorage();
-    const seed = await bootApp({ now: NOW });
-    const legacy = seed.state();
-    delete legacy.v;
+    const legacy = v1State();
     legacy.meso.name = 'legacy meso';
     ls.data.set('ironengine:state2', JSON.stringify(legacy));
 
@@ -193,27 +199,27 @@ describe('storage failures never overwrite saved data', () => {
 
 /* log every set of exercise i in session k at the given reps */
 const logReps = (app, k, i, reps) =>
-  app.call(`ST.meso.log.${k}[${i}].forEach((s,j)=>{ s.reps=${JSON.stringify(reps)}[j]; s.st='logged'; }); await save();`);
+  app.call(`ST.meso.log.${k}[${i}].sets.forEach((s,j)=>{ s.reps=${JSON.stringify(reps)}[j]; s.st='logged'; }); await save();`);
 
 describe('provisional prescriptions (looking ahead never freezes numbers)', () => {
   test('week 3 viewed early still updates once week 2 is logged', async () => {
     const app = await bootApp({ now: NOW });
     await app.call('await pickWeek(3);');
-    assert.deepEqual(app.state().meso.log.w3d3[3], [rirOnly(120, 2), rirOnly(120, 2), rirOnly(120, 2)]);
-    assert.match(app.state().meso.days[2][3]._why.w3d3, /Preview/);
+    assert.deepEqual(app.state().meso.log.w3d3[3].sets, [rirOnly(120, 2), rirOnly(120, 2), rirOnly(120, 2)]);
+    assert.match(app.state().meso.log.w3d3[3].why, /Preview/);
 
     await app.call('await pickWeek(2);');
     await logReps(app, 'w2d3', 3, [11, 10, 9]);
     await app.call('await pickWeek(3);');
     const st = app.state();
-    assert.deepEqual(st.meso.log.w3d3[3], [target(120, 12), target(120, 11), target(120, 10), rirOnly(120, 2)]);
-    assert.match(st.meso.days[2][3]._why.w3d3, /R1/);
+    assert.deepEqual(st.meso.log.w3d3[3].sets, [target(120, 12), target(120, 11), target(120, 10), rirOnly(120, 2)]);
+    assert.match(st.meso.log.w3d3[3].why, /R1/);
   });
 
   test('tapping the deload week from week 2 never produces 0 lb sets', async () => {
     const app = await bootApp({ now: NOW });
     await app.call('await pickWeek(6);');
-    const w6 = app.state().meso.log.w6d3.flat();
+    const w6 = app.state().meso.log.w6d3.flatMap(e => e.sets);
     assert.ok(w6.length > 0);
     assert.ok(w6.every(s => s.w > 0), JSON.stringify(w6.map(s => s.w)));
   });
@@ -228,8 +234,8 @@ describe('provisional prescriptions (looking ahead never freezes numbers)', () =
     await app.call('await pickWeek(3);');
     const st = app.state();
     assert.deepEqual(st.meso.log.w3d3[3], frozen);
-    assert.equal(st.meso.log.w3d3[3][0].w, 125);
-    assert.deepEqual(st.meso.log.w3d3[5].slice(0, 2), [target(120, 9), target(120, 9)]);
+    assert.equal(st.meso.log.w3d3[3].sets[0].w, 125);
+    assert.deepEqual(st.meso.log.w3d3[5].sets.slice(0, 2), [target(120, 9), target(120, 9)]);
   });
 
   test('navigating without changes does not rewrite storage', async () => {
@@ -253,11 +259,11 @@ describe('feedback belongs to one session (C2)', () => {
     await app.call('selDay=2; await pickWeek(2);');
     await giveFeedback(app, 2, { ...NEUTRAL, pain: 2 });            // close-grip bench, Wed
     await app.call('await pickWeek(3);');
-    assert.deepEqual(app.state().meso.log.w3d2[2], [target(120, 12), target(120, 11)]);
+    assert.deepEqual(app.state().meso.log.w3d2[2].sets, [target(120, 12), target(120, 11)]);
 
     await logReps(app, 'w3d2', 2, [12, 11]);
     await app.call('await pickWeek(4);');
-    assert.deepEqual(app.state().meso.log.w4d2[2], [target(120, 13), target(120, 12), rirOnly(120, 1)]);
+    assert.deepEqual(app.state().meso.log.w4d2[2].sets, [target(120, 13), target(120, 12), rirOnly(120, 1)]);
   });
 
   test('feedback given after peeking at next week still takes effect', async () => {
@@ -265,7 +271,7 @@ describe('feedback belongs to one session (C2)', () => {
     await app.call('selDay=2; await pickWeek(3); await pickWeek(2);');
     await giveFeedback(app, 2, { ...NEUTRAL, workload: 3 });        // "too much" -> hold sets
     await app.call('await pickWeek(3);');
-    assert.equal(app.state().meso.log.w3d2[2].length, 2);
+    assert.equal(app.state().meso.log.w3d2[2].sets.length, 2);
   });
 
   test('the feedback checkmark shows only in the session it was given', async () => {
@@ -279,10 +285,9 @@ describe('feedback belongs to one session (C2)', () => {
 
   test('v1 migration moves legacy per-exercise feedback to its latest logged session', async () => {
     const ls = fakeLocalStorage();
-    const legacy = (await bootApp({ now: NOW })).state();
-    delete legacy.v; delete legacy.meso.fb;
+    const legacy = v1State();
     const pain = { ...NEUTRAL, pain: 3 };
-    legacy.meso.days[1][2].feedback = pain;                          // bench Wed: logged in week 2
+    legacy.meso.days[1][2].feedback = pain;                          // bench Wed: latest logged in week 3
     legacy.meso.days[0][0].feedback = NEUTRAL;                       // Mon ex 0: logged in week 2
     legacy.meso.log.w3d1 = legacy.meso.log.w2d1.map(sets => sets.map(s => ({ ...s, st: null })));
     ls.data.set('ironengine:state2', JSON.stringify(legacy));
@@ -290,8 +295,8 @@ describe('feedback belongs to one session (C2)', () => {
     const app = await bootApp({ now: NOW, localStorage: ls });
     const st = app.state();
     assert.equal(st.v, app.run('SCHEMA_VERSION'));
-    assert.deepEqual(st.meso.fb.w2d2[2], pain);
-    assert.deepEqual(st.meso.fb.w2d1[0], NEUTRAL);                   // week 3 Mon untouched, so week 2
+    assert.deepEqual(st.meso.log.w3d2[2].fb, pain);
+    assert.deepEqual(st.meso.log.w2d1[0].fb, NEUTRAL);               // week 3 Mon untouched, so week 2
     assert.ok(st.meso.days.flat().every(ex => !('feedback' in ex)));
   });
 });
@@ -355,8 +360,7 @@ describe('destructive actions and backups (C3)', () => {
   });
 
   test('import accepts an old unversioned clipboard export and migrates it', async () => {
-    const legacy = (await bootApp({ now: NOW })).state();
-    delete legacy.v; delete legacy.archive; delete legacy.meso.fb;
+    const legacy = v1State();
     legacy.meso.name = 'old export';
     const app = await bootApp({ now: NOW, confirm: () => true });
     await app.call(`await importText(${JSON.stringify(JSON.stringify(legacy))});`);
@@ -379,7 +383,7 @@ describe('destructive actions and backups (C3)', () => {
 });
 
 describe('log button never destroys entered reps (S3)', () => {
-  const set0 = app => app.state().meso.log.w2d3[3][0];   // close-grip bench, set 1 (target 11)
+  const set0 = app => app.state().meso.log.w2d3[3].sets[0];   // close-grip bench, set 1 (target 11)
 
   test('tapping a logged set un-logs it and keeps the reps; tapping again re-logs', async () => {
     const app = await bootApp({ now: NOW });
@@ -399,7 +403,7 @@ describe('log button never destroys entered reps (S3)', () => {
 
   test('a set with no reps and no target needs a second tap to skip', async () => {
     const app = await bootApp({ now: NOW });
-    const s = () => app.state().meso.log.w2d3[3][2];     // the new set: RIR target only
+    const s = () => app.state().meso.log.w2d3[3].sets[2];     // the new set: RIR target only
     await app.call('await tapLog(3,2);');
     assert.equal(s().st, null);
     await app.call('await tapLog(3,2);');
@@ -411,7 +415,7 @@ describe('log button never destroys entered reps (S3)', () => {
   test('"Skip rest" skips only the sets not yet logged', async () => {
     const app = await bootApp({ now: NOW });
     await app.call('await tapLog(3,0); await skipRest(3);');
-    assert.deepEqual(app.state().meso.log.w2d3[3].map(s => s.st), ['logged', 'skipped', 'skipped']);
+    assert.deepEqual(app.state().meso.log.w2d3[3].sets.map(s => s.st), ['logged', 'skipped', 'skipped']);
     assert.doesNotMatch(app.els.get('main').innerHTML, /skipRest\(3\)/);
   });
 });
@@ -486,5 +490,39 @@ describe('app opens where you left off (S2)', () => {
     await a.call('await makeDraft(); await activateDraft();');
     const b = await bootApp({ now: NOW, localStorage: ls });
     assert.deepEqual([b.run('selWeek'), b.run('selDay')], [1, 1]);
+  });
+});
+
+describe('schema v5: sessions are lists of entries with permanent slot ids', () => {
+  const bootFromV4 = async () => {
+    const ls = fakeLocalStorage();
+    ls.data.set('ironengine:state2', JSON.stringify(v4State()));
+    return bootApp({ now: NOW, localStorage: ls });
+  };
+
+  test('v4 save upgrades: entries carry slot, name, sets, feedback, why', async () => {
+    const old = v4State();
+    const st = (await bootFromV4()).state();
+    const ids = st.meso.days.flat().map(s => s.id);
+    assert.equal(new Set(ids).size, ids.length, 'slot ids unique');
+    assert.equal(st.meso.seq, ids.length);
+
+    const e = st.meso.log.w2d2[2];
+    assert.equal(e.slot, st.meso.days[1][2].id);
+    assert.equal(e.name, 'Bench Press (Close Grip)');
+    assert.deepEqual(e.sets, old.meso.log.w2d2[2]);
+    assert.deepEqual(e.fb, old.meso.fb.w2d2[2]);
+    assert.equal(st.meso.log.w2d3[3].why, old.meso.days[2][3]._why.w2d3);
+
+    assert.equal(st.meso.fb, undefined);
+    assert.ok(st.meso.days.flat().every(s => !('_why' in s)));
+  });
+
+  test('upgraded data prescribes exactly what v4 did', async () => {
+    const old = v4State();
+    const st = (await bootFromV4()).state();
+    for (const k of Object.keys(old.meso.log)) {
+      assert.deepEqual(st.meso.log[k].map(e => e.sets), old.meso.log[k], k);
+    }
   });
 });

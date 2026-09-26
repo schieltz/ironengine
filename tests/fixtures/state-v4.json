@@ -1,0 +1,781 @@
+{
+ "v": 4,
+ "meso": {
+  "name": "New meso plan",
+  "weeks": 5,
+  "curWeek": 2,
+  "curDay": 3,
+  "days": [
+   [
+    {
+     "name": "Dip (Weighted, Triceps-Focused)",
+     "mg": "TRICEPS",
+     "equip": "Bodyweight Loadable",
+     "note": null
+    },
+    {
+     "name": "Cable Triceps Pushdown (Bar)",
+     "mg": "TRICEPS",
+     "equip": "Cable",
+     "note": null
+    },
+    {
+     "name": "Cable Upright Row",
+     "mg": "SHOULDERS",
+     "equip": "Cable",
+     "note": null
+    },
+    {
+     "name": "Cable Curl",
+     "mg": "BICEPS",
+     "equip": "Cable",
+     "note": "Straight bar"
+    },
+    {
+     "name": "Bench Press (Medium Grip)",
+     "mg": "CHEST",
+     "equip": "Barbell",
+     "note": null
+    },
+    {
+     "name": "Romanian Deadlift",
+     "mg": "GLUTES",
+     "equip": "Barbell",
+     "note": null
+    }
+   ],
+   [
+    {
+     "name": "EZ Bar Curl (Normal Grip)",
+     "mg": "BICEPS",
+     "equip": "Barbell",
+     "note": null,
+     "_why": {
+      "w3d2": "Same weight, last week's reps <b>+1</b> (R1). Set 3: 7 reps last week, 4 fewer than set 1 → load cut to <b>55</b>, 2 RIR (R3). +1 set at <b>55</b> to <b>2 RIR</b> (R2)."
+     }
+    },
+    {
+     "name": "Hammer Curl",
+     "mg": "BICEPS",
+     "equip": "Dumbbell",
+     "note": null,
+     "_why": {
+      "w3d2": "Same weight, last week's reps <b>+1</b> (R1). +1 set at <b>20</b> to <b>2 RIR</b> (R2)."
+     }
+    },
+    {
+     "name": "Bench Press (Close Grip)",
+     "mg": "TRICEPS",
+     "equip": "Barbell",
+     "note": null,
+     "_why": {
+      "w3d2": "Same weight, last week's reps <b>+1</b> (R1). +1 set at <b>120</b> to <b>2 RIR</b> (R2)."
+     }
+    },
+    {
+     "name": "Dumbbell Shoulder Press (Standing)",
+     "mg": "SHOULDERS",
+     "equip": "Dumbbell",
+     "note": null,
+     "_why": {
+      "w3d2": "Same weight, last week's reps <b>+1</b> (R1). Set 2: 8 reps last week, 3 fewer than set 1 → load cut to <b>35</b>, 2 RIR (R3). Set 3: 7 reps last week, 4 fewer than set 1 → load cut to <b>35</b>, 2 RIR (R3). +1 set at <b>35</b> to <b>2 RIR</b> (R2)."
+     }
+    },
+    {
+     "name": "Chest Supported Row",
+     "mg": "BACK",
+     "equip": "Machine",
+     "note": "At home, manta bar",
+     "_why": {
+      "w3d2": "Same weight, last week's reps <b>+1</b> (R1). Set 2: 8 reps last week, 3 fewer than set 1 → load cut to <b>60</b>, 2 RIR (R3). +1 set at <b>60</b> to <b>2 RIR</b> (R2)."
+     }
+    },
+    {
+     "name": "Stiff-Legged Deadlift",
+     "mg": "HAMSTRINGS",
+     "equip": "Barbell",
+     "note": null,
+     "_why": {
+      "w3d2": "Same weight, last week's reps <b>+1</b> (R1). +1 set at <b>120</b> to <b>2 RIR</b> (R2)."
+     }
+    }
+   ],
+   [
+    {
+     "name": "Dumbbell Lateral Raise",
+     "mg": "SHOULDERS",
+     "equip": "Dumbbell",
+     "note": null
+    },
+    {
+     "name": "Cable Upright Row",
+     "mg": "SHOULDERS",
+     "equip": "Cable",
+     "note": null
+    },
+    {
+     "name": "EZ Bar Curl (Normal Grip)",
+     "mg": "BICEPS",
+     "equip": "Barbell",
+     "note": null
+    },
+    {
+     "name": "Bench Press (Close Grip)",
+     "mg": "TRICEPS",
+     "equip": "Barbell",
+     "note": null,
+     "_why": {
+      "w2d3": "Same weight, last week's reps <b>+1</b> (R1). +1 set at <b>120</b> to <b>2 RIR</b> (R2)."
+     }
+    },
+    {
+     "name": "Dumbbell Press (High Incline)",
+     "mg": "CHEST",
+     "equip": "Dumbbell",
+     "note": null,
+     "_why": {
+      "w2d3": "Same weight, last week's reps <b>+1</b> (R1). Set 2: 4 reps last week (at or below the 4-rep floor) → load cut to <b>55</b>, 2 RIR (R3). +1 set at <b>55</b> to <b>2 RIR</b> (R2)."
+     }
+    },
+    {
+     "name": "Barbell Bent Over Row",
+     "mg": "BACK",
+     "equip": "Barbell",
+     "note": null,
+     "_why": {
+      "w2d3": "No logged sets last week → same weights, work to <b>2 RIR</b> (R6)."
+     }
+    },
+    {
+     "name": "Deadlift",
+     "mg": "BACK",
+     "equip": "Barbell",
+     "note": null,
+     "_why": {
+      "w2d3": "No logged sets last week → same weights, work to <b>2 RIR</b> (R6)."
+     }
+    },
+    {
+     "name": "Zercher Squat",
+     "mg": "QUADS",
+     "equip": "Barbell",
+     "note": null,
+     "_why": {
+      "w2d3": "No logged sets last week → same weights, work to <b>2 RIR</b> (R6)."
+     }
+    }
+   ]
+  ],
+  "log": {
+   "w1d3": [
+    [
+     {
+      "w": 20,
+      "reps": 9,
+      "st": "logged"
+     },
+     {
+      "w": 20,
+      "reps": 8,
+      "st": "logged"
+     }
+    ],
+    [
+     {
+      "w": 30,
+      "reps": 10,
+      "st": "logged"
+     },
+     {
+      "w": 30,
+      "reps": 8,
+      "st": "logged"
+     }
+    ],
+    [
+     {
+      "w": 60,
+      "reps": null,
+      "st": "skipped"
+     },
+     {
+      "w": 60,
+      "reps": null,
+      "st": "skipped"
+     },
+     {
+      "w": 60,
+      "reps": null,
+      "st": "skipped"
+     }
+    ],
+    [
+     {
+      "w": 120,
+      "reps": 10,
+      "st": "logged"
+     },
+     {
+      "w": 120,
+      "reps": 9,
+      "st": "logged"
+     }
+    ],
+    [
+     {
+      "w": 60,
+      "reps": 5,
+      "st": "logged"
+     },
+     {
+      "w": 60,
+      "reps": 4,
+      "st": "logged"
+     }
+    ],
+    [
+     {
+      "w": 120,
+      "reps": null,
+      "st": "skipped"
+     },
+     {
+      "w": 120,
+      "reps": null,
+      "st": "skipped"
+     }
+    ],
+    [
+     {
+      "w": 300,
+      "reps": null,
+      "st": "skipped"
+     },
+     {
+      "w": 300,
+      "reps": null,
+      "st": "skipped"
+     }
+    ],
+    [
+     {
+      "w": 120,
+      "reps": null,
+      "st": "skipped"
+     },
+     {
+      "w": 120,
+      "reps": null,
+      "st": "skipped"
+     }
+    ]
+   ],
+   "w2d1": [
+    [
+     {
+      "w": 40,
+      "reps": 10,
+      "st": "logged"
+     },
+     {
+      "w": 40,
+      "reps": 9,
+      "st": "logged"
+     }
+    ],
+    [
+     {
+      "w": 30,
+      "reps": 14,
+      "st": "logged"
+     },
+     {
+      "w": 30,
+      "reps": 12,
+      "st": "logged"
+     }
+    ],
+    [
+     {
+      "w": 30,
+      "reps": 10,
+      "st": "logged"
+     },
+     {
+      "w": 30,
+      "reps": 9,
+      "st": "logged"
+     },
+     {
+      "w": 30,
+      "reps": 8,
+      "st": "logged"
+     }
+    ],
+    [
+     {
+      "w": 30,
+      "reps": 10,
+      "st": "logged"
+     },
+     {
+      "w": 30,
+      "reps": 10,
+      "st": "logged"
+     },
+     {
+      "w": 30,
+      "reps": 8,
+      "st": "logged"
+     }
+    ],
+    [
+     {
+      "w": 120,
+      "reps": null,
+      "st": "skipped"
+     },
+     {
+      "w": 175,
+      "reps": null,
+      "st": "skipped"
+     }
+    ],
+    [
+     {
+      "w": 175,
+      "reps": null,
+      "st": "skipped"
+     },
+     {
+      "w": 175,
+      "reps": null,
+      "st": "skipped"
+     }
+    ]
+   ],
+   "w2d2": [
+    [
+     {
+      "w": 60,
+      "reps": 11,
+      "st": "logged"
+     },
+     {
+      "w": 60,
+      "reps": 9,
+      "st": "logged"
+     },
+     {
+      "w": 60,
+      "reps": 7,
+      "st": "logged"
+     }
+    ],
+    [
+     {
+      "w": 20,
+      "reps": 8,
+      "st": "logged"
+     },
+     {
+      "w": 20,
+      "reps": 7,
+      "st": "logged"
+     },
+     {
+      "w": 20,
+      "reps": 7,
+      "st": "logged"
+     }
+    ],
+    [
+     {
+      "w": 120,
+      "reps": 12,
+      "st": "logged"
+     },
+     {
+      "w": 120,
+      "reps": 11,
+      "st": "logged"
+     }
+    ],
+    [
+     {
+      "w": 40,
+      "reps": 11,
+      "st": "logged"
+     },
+     {
+      "w": 40,
+      "reps": 8,
+      "st": "logged"
+     },
+     {
+      "w": 40,
+      "reps": 7,
+      "st": "logged"
+     }
+    ],
+    [
+     {
+      "w": 65,
+      "reps": 11,
+      "st": "logged"
+     },
+     {
+      "w": 65,
+      "reps": 8,
+      "st": "logged"
+     }
+    ],
+    [
+     {
+      "w": 120,
+      "reps": 9,
+      "st": "logged"
+     }
+    ]
+   ],
+   "w2d3": [
+    [
+     {
+      "w": 20,
+      "reps": 8,
+      "st": "logged"
+     },
+     {
+      "w": 20,
+      "reps": 7,
+      "st": "logged"
+     },
+     {
+      "w": 20,
+      "reps": 7,
+      "st": "logged"
+     }
+    ],
+    [
+     {
+      "w": 30,
+      "reps": 8,
+      "st": "logged"
+     }
+    ],
+    [
+     {
+      "w": 60,
+      "reps": 10,
+      "st": "logged"
+     },
+     {
+      "w": 60,
+      "reps": 8,
+      "st": "logged"
+     },
+     {
+      "w": 60,
+      "reps": 7,
+      "st": "logged"
+     },
+     {
+      "w": 60,
+      "reps": 7,
+      "st": "logged"
+     }
+    ],
+    [
+     {
+      "w": 120,
+      "tgt": 11,
+      "rir": null,
+      "st": null,
+      "reps": null
+     },
+     {
+      "w": 120,
+      "tgt": 10,
+      "rir": null,
+      "st": null,
+      "reps": null
+     },
+     {
+      "w": 120,
+      "tgt": null,
+      "rir": 2,
+      "st": null,
+      "reps": null
+     }
+    ],
+    [
+     {
+      "w": 60,
+      "tgt": 6,
+      "rir": null,
+      "st": null,
+      "reps": null
+     },
+     {
+      "w": 55,
+      "tgt": null,
+      "rir": 2,
+      "st": null,
+      "reps": null
+     },
+     {
+      "w": 55,
+      "tgt": null,
+      "rir": 2,
+      "st": null,
+      "reps": null
+     }
+    ],
+    [
+     {
+      "w": 120,
+      "tgt": null,
+      "rir": 2,
+      "st": null,
+      "reps": null
+     },
+     {
+      "w": 120,
+      "tgt": null,
+      "rir": 2,
+      "st": null,
+      "reps": null
+     }
+    ],
+    [
+     {
+      "w": 300,
+      "tgt": null,
+      "rir": 2,
+      "st": null,
+      "reps": null
+     },
+     {
+      "w": 300,
+      "tgt": null,
+      "rir": 2,
+      "st": null,
+      "reps": null
+     }
+    ],
+    [
+     {
+      "w": 120,
+      "tgt": null,
+      "rir": 2,
+      "st": null,
+      "reps": null
+     },
+     {
+      "w": 120,
+      "tgt": null,
+      "rir": 2,
+      "st": null,
+      "reps": null
+     }
+    ]
+   ],
+   "w3d2": [
+    [
+     {
+      "w": 60,
+      "tgt": 12,
+      "rir": null,
+      "st": null,
+      "reps": null
+     },
+     {
+      "w": 60,
+      "tgt": 10,
+      "rir": null,
+      "st": null,
+      "reps": null
+     },
+     {
+      "w": 55,
+      "tgt": null,
+      "rir": 2,
+      "st": null,
+      "reps": null
+     },
+     {
+      "w": 55,
+      "tgt": null,
+      "rir": 2,
+      "st": null,
+      "reps": null
+     }
+    ],
+    [
+     {
+      "w": 20,
+      "tgt": 9,
+      "rir": null,
+      "st": null,
+      "reps": null
+     },
+     {
+      "w": 20,
+      "tgt": 8,
+      "rir": null,
+      "st": null,
+      "reps": null
+     },
+     {
+      "w": 20,
+      "tgt": 8,
+      "rir": null,
+      "st": null,
+      "reps": null
+     },
+     {
+      "w": 20,
+      "tgt": null,
+      "rir": 2,
+      "st": null,
+      "reps": null
+     }
+    ],
+    [
+     {
+      "w": 120,
+      "tgt": 13,
+      "rir": null,
+      "st": "logged",
+      "reps": 13,
+      "u": 1
+     },
+     {
+      "w": 120,
+      "tgt": 12,
+      "rir": null,
+      "st": null,
+      "reps": null
+     },
+     {
+      "w": 120,
+      "tgt": null,
+      "rir": 2,
+      "st": null,
+      "reps": null
+     }
+    ],
+    [
+     {
+      "w": 40,
+      "tgt": 12,
+      "rir": null,
+      "st": null,
+      "reps": null
+     },
+     {
+      "w": 35,
+      "tgt": null,
+      "rir": 2,
+      "st": null,
+      "reps": null
+     },
+     {
+      "w": 35,
+      "tgt": null,
+      "rir": 2,
+      "st": null,
+      "reps": null
+     },
+     {
+      "w": 35,
+      "tgt": null,
+      "rir": 2,
+      "st": null,
+      "reps": null
+     }
+    ],
+    [
+     {
+      "w": 65,
+      "tgt": 12,
+      "rir": null,
+      "st": null,
+      "reps": null
+     },
+     {
+      "w": 60,
+      "tgt": null,
+      "rir": 2,
+      "st": null,
+      "reps": null
+     },
+     {
+      "w": 60,
+      "tgt": null,
+      "rir": 2,
+      "st": null,
+      "reps": null
+     }
+    ],
+    [
+     {
+      "w": 120,
+      "tgt": 10,
+      "rir": null,
+      "st": null,
+      "reps": null
+     },
+     {
+      "w": 120,
+      "tgt": null,
+      "rir": 2,
+      "st": null,
+      "reps": null
+     }
+    ]
+   ]
+  },
+  "fb": {
+   "w2d2": [
+    null,
+    null,
+    {
+     "soreness": 2,
+     "pain": 1,
+     "pump": 1,
+     "workload": 1
+    }
+   ]
+  },
+  "dates": {
+   "w1d3": "2026-07-09",
+   "w2d3": "2026-07-19",
+   "w3d2": "2026-09-25"
+  }
+ },
+ "hist": {
+  "Deadlift": {
+   "w": 300,
+   "date": "2026-07-04"
+  },
+  "Zercher Squat": {
+   "w": 120,
+   "date": "2026-07-04"
+  },
+  "Romanian Deadlift": {
+   "w": 175,
+   "date": "2026-07-06"
+  },
+  "Bench Press (Medium Grip)": {
+   "w": 175,
+   "date": "2026-07-06"
+  },
+  "Barbell Bent Over Row": {
+   "w": 120,
+   "date": "2026-07-04"
+  }
+ },
+ "draft": null,
+ "archive": []
+}
