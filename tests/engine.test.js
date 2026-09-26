@@ -140,6 +140,15 @@ describe('R7 deload (week 6)', () => {
     });
   }
 
+  for (const [skipped, expected] of [[4, 2], [3, 2], [1, 1]]) {
+    test(`week 5 fully skipped (${skipped} sets) -> deload still halves to ${expected}`, () => {
+      const prev = Array.from({ length: skipped }, (_, i) => S(100 + i * 5));
+      const p = E.prescribe(EX, prev, 6, null);
+      assert.deepEqual(p.sets, prev.slice(0, expected).map(s => rirOnly(s.w, 8)));
+      assert.match(p.why, /R6\+R7/);
+    });
+  }
+
   test('deload ignores feedback gates', () => {
     const p = E.prescribe(EX, [L(100, 8), L(100, 8)], 6, fb({ workload: 0, soreness: 0, pump: 0 }));
     assert.equal(p.sets.length, 1);

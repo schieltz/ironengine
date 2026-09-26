@@ -470,7 +470,13 @@ function prescribe(ex, prevSets, week, feedback){
   const why=[];
   const logged=(prevSets||[]).filter(s=>s && s.st==='logged' && s.reps!=null);
   if(!prevSets || logged.length===0){
-    const base=(prevSets&&prevSets.length?prevSets:[{w:0}]).map(s=>({w:s.w,tgt:null,rir,st:null,reps:null}));
+    let src=prevSets&&prevSets.length?prevSets:[{w:0}];
+    if(week>RIR_RAMP.length){   /* deload still halves the sets when last week was skipped */
+      src=src.slice(0,Math.max(1,Math.ceil(src.length/2)));
+      return {sets:src.map(s=>({w:s.w,tgt:null,rir,st:null,reps:null})),
+        why:`No logged sets last week → same weights; deload: <b>${src.length} set${src.length>1?'s':''}</b> at ${DELOAD_RIR} RIR (R6+R7).`};
+    }
+    const base=src.map(s=>({w:s.w,tgt:null,rir,st:null,reps:null}));
     return {sets:base,why:`No logged sets last week → same weights, work to <b>${rir} RIR</b> (R6).`};
   }
   if(week>RIR_RAMP.length){
@@ -608,7 +614,7 @@ function planDay(w,d){ /* returns true when anything changed */
     else{
       p=prescribe(ex,prev[i],w,fbFor(key(w-1,d),i));
       if(!prev[i].some(s=>s.st)) p.why=`Preview: ${DAYS[d-1]} week ${w-1} isn't logged yet, so this repeats its weights `
-        +`at <b>${rirFor(w)} RIR</b>. Updates automatically once you log it.`;
+        +`at <b>${rirFor(w)} RIR</b>${w>RIR_RAMP.length?', half the sets (deload)':''}. Updates automatically once you log it.`;
     }
     ex._why=ex._why||{};
     if(JSON.stringify([log[i],ex._why[k]])!==JSON.stringify([p.sets,p.why])) changed=true;
