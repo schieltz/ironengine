@@ -28,7 +28,7 @@ Live: https://schieltz.github.io/ironengine/
 |------|----------|------------|
 | R1 | Same weight, prior week reps +1 per set | VERIFIED vs RP exactly |
 | R2 | +1 set/exercise/week; new sets get weight + RIR target only | Inferred, mechanism confirmed. History shows no weekly adds on EZ curl (lead only, see Calibration evidence) |
-| R3 | Later sets ≤4 reps or ≥3 below set 1 → ~8% load cut, RIR reset | VERIFIED (60×4 → 55 exact match). The 8% is inferred: 60→55 fits any 4.2-12.5% cut. Set count after the cut (2 vs 3) unconfirmed. Only the ≤4-rep floor trigger is verified; the ≥3-below-set-1 trigger is doubtful (history leads, not proof) |
+| R3 | Later sets ≤4 reps or ≥3 below set 1 → ~8% load cut, RIR reset. Load is held (never raised) when rounding cancels the cut or the set is bodyweight; the "why" names the trigger | VERIFIED (60×4 → 55 exact match). The 8% is inferred: 60→55 fits any 4.2-12.5% cut. Set count after the cut (2 vs 3) unconfirmed. Only the ≤4-rep floor trigger is verified; the ≥3-below-set-1 trigger is doubtful (history leads, not proof) |
 | R4 | Joint pain ≥ moderate → hold reps, no set add | Inferred |
 | R5 | Workload 'too much' → hold sets; 'not enough' → +2 | Inferred |
 | R6 | All sets skipped → re-prescribe same weights, RIR only | VERIFIED |

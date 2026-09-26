@@ -90,6 +90,25 @@ describe('R3 load-cut thresholds (spec: later set <=4 reps or >=3 below set 1)',
     assert.deepEqual(p.sets[1], rirOnly(185, 2));
   });
 
+  test('"why" names the trigger that fired', () => {
+    assert.match(E.prescribe(EX, [L(60, 5), L(60, 4)], 2, null).why, /4-rep floor/);
+    assert.match(E.prescribe(EX, [L(100, 8), L(100, 5)], 2, null).why, /3 fewer than set 1/);
+  });
+
+  test('light load where rounding cancels the cut: weight held, and the "why" says so', () => {
+    const p = E.prescribe(EX, [L(20, 9), L(20, 5)], 2, null);
+    assert.deepEqual(p.sets[1], rirOnly(20, 2));
+    assert.match(p.why, /rounds back to 20, so load held/);
+    assert.doesNotMatch(p.why, /cut to <b>20/);
+  });
+
+  test('bodyweight set is never "cut" up to a load', () => {
+    const p = E.prescribe(EX, [L(null, 10), L(null, 5)], 2, null);
+    assert.deepEqual(p.sets.slice(0, 2), [target(null, 11), rirOnly(null, 2)]);
+    assert.match(p.why, /bodyweight, so no load to cut/);
+    assert.doesNotMatch(p.why, /null/);
+  });
+
   test('set 1 is never cut, even at <=4 reps', () => {
     const p = E.prescribe(EX, [L(100, 4), L(100, 4)], 2, null);
     assert.deepEqual(p.sets[0], target(100, 5));

@@ -488,9 +488,18 @@ function prescribe(ex, prevSets, week, feedback){
   const painGate=f.pain>=RULES.painGate, soreGate=f.soreness===3;
   const firstReps=logged[0].reps;
   const sets=logged.map((s,i)=>{
-    if(i>0 && (s.reps<=RULES.floorReps || (firstReps-s.reps)>=RULES.dropFromFirst)){
-      const w=roundLoad(s.w*(1-RULES.cutPct));
-      why.push(`Set ${i+1}: ${s.reps} reps last week (below range floor) → load cut to <b>${w}</b>, ${rir} RIR (R3).`);
+    const drop=firstReps-s.reps;
+    if(i>0 && (s.reps<=RULES.floorReps || drop>=RULES.dropFromFirst)){
+      const cause=s.reps<=RULES.floorReps ? `${s.reps} reps last week (at or below the ${RULES.floorReps}-rep floor)`
+        : `${s.reps} reps last week, ${drop} fewer than set 1`;
+      const w=s.w ? roundLoad(s.w*(1-RULES.cutPct)) : s.w;
+      /* never raise a load or claim a cut that rounding cancelled; bodyweight has nothing to cut */
+      if(!s.w || w>=s.w){
+        why.push(`Set ${i+1}: ${cause} → ${s.w?`the ${pct(RULES.cutPct)}% cut rounds back to ${s.w}, so load held at <b>${s.w}</b>`
+          :'bodyweight, so no load to cut'}; work to ${rir} RIR (R3).`);
+        return {w:s.w,tgt:null,rir,st:null,reps:null};
+      }
+      why.push(`Set ${i+1}: ${cause} → load cut to <b>${w}</b>, ${rir} RIR (R3).`);
       return {w,tgt:null,rir,st:null,reps:null};
     }
     return {w:s.w,tgt:painGate?s.reps:s.reps+1,rir:null,st:null,reps:null};
@@ -504,7 +513,7 @@ function prescribe(ex, prevSets, week, feedback){
     const adds=strongAdd?RULES.strongSetAdd:RULES.setAdd;
     const lastW=sets[sets.length-1].w;
     for(let a=0;a<adds;a++) sets.push({w:lastW,tgt:null,rir,st:null,reps:null});
-    why.push(`+${adds} set at <b>${lastW}</b> to <b>${rir} RIR</b> (R2${strongAdd?'+R5/R8: under-stimulated signal':''}).`);
+    why.push(`+${adds} set at <b>${lastW??'bodyweight'}</b> to <b>${rir} RIR</b> (R2${strongAdd?'+R5/R8: under-stimulated signal':''}).`);
   }
   return {sets,why:why.join(' ')};
 }
