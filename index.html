@@ -14,7 +14,7 @@
   --green:#3FA372; --red:#C05043; --amber:#C99B3F;
   --mg-CHEST:#B85C8A; --mg-BACK:#4C93A8; --mg-TRICEPS:#9A5CB8; --mg-BICEPS:#4C7FA8;
   --mg-SHOULDERS:#B87A5C; --mg-HAMSTRINGS:#5CA86E; --mg-GLUTES:#7FA85C; --mg-QUADS:#A8A05C;
-  --mg-CALVES:#8A7AB8; --mg-TRAPS:#8A8A9E; --mg-FOREARMS:#7A8AB8;
+  --mg-CALVES:#8A7AB8; --mg-TRAPS:#8A8A9E; --mg-FOREARMS:#7A8AB8; --mg-ABS:#A87A7A;
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{background:var(--bg);color:var(--ink);font-family:-apple-system,'SF Pro Text',system-ui,sans-serif;
@@ -210,11 +210,12 @@ const store = {
 };
 store.init();
 const DAYS=['Mon','Wed','Fri'];
-const MGS=['CHEST','BACK','SHOULDERS','TRICEPS','BICEPS','QUADS','GLUTES','HAMSTRINGS','CALVES','FOREARMS'];
+const MGS=['CHEST','BACK','SHOULDERS','TRICEPS','BICEPS','QUADS','GLUTES','HAMSTRINGS','CALVES','TRAPS','FOREARMS','ABS'];
 
-/* ---------- exercise catalog: John's performed list from RP ---------- */
-/* [name, mg, equip, lastPerformed] — equip drives home-compatibility */
-const HOME_MACHINES=['Leg Extension','Seated Leg Curl'];
+/* ---------- exercise catalog ----------
+   John's performed list from RP (with last-performed dates), plus exercises he approved in the
+   2026-09-26 library review (last: null). [name, mg, equip, lastPerformed]; equip drives home-compatibility */
+const HOME_MACHINES=['Leg Extension','Seated Leg Curl','Leg Extension (Single Leg)','Seated Leg Curl (Single Leg)'];
 function isHome(c){
   if(['Barbell','Dumbbell','Cable','Bodyweight Only','Bodyweight Loadable'].includes(c.equip)) return true;
   return HOME_MACHINES.includes(c.name);
@@ -226,6 +227,13 @@ const CATALOG=[
 ['Standing Calf Raise','CALVES','Machine','2026-02-10'],
 ['Smith Machine Calves','CALVES','Smith Machine','2025-04-26'],
 ['Calf Machine','CALVES','Machine','2026-03-01'],
+/* CALVES: added from the 2026-09-26 library review */
+['Seated Calf Raise','CALVES','Machine',null],
+['Leg Press Calves','CALVES','Machine',null],
+['Donkey Calves','CALVES','Machine',null],
+['Barbell Calves','CALVES','Barbell',null],
+['Dumbbell Calves (Single Leg)','CALVES','Dumbbell',null],
+['Stair Calves (Weighted)','CALVES','Bodyweight Loadable',null],
 /* HAMSTRINGS */
 ['Stiff-Legged Deadlift','HAMSTRINGS','Barbell','2026-07-18'],
 ['Dumbbell Stiff Legged Deadlift','HAMSTRINGS','Dumbbell','2025-11-08'],
@@ -234,6 +242,14 @@ const CATALOG=[
 ['Back Raise (45 degree)','HAMSTRINGS','Bodyweight Only','2026-01-06'],
 ['Back Raise (Glute Ham Deck)','HAMSTRINGS','Bodyweight Only','2025-06-21'],
 ['Barbell Good Morning (High Bar)','HAMSTRINGS','Barbell','2025-10-02'],
+/* HAMSTRINGS: added from the 2026-09-26 library review */
+['Lying Leg Curl','HAMSTRINGS','Machine',null],
+['Standing Leg Curl','HAMSTRINGS','Machine',null],
+['Seated Leg Curl (Single Leg)','HAMSTRINGS','Machine',null],
+['Dumbbell Lying Leg Curl','HAMSTRINGS','Dumbbell',null],
+['Cable Leg Curl (Standing)','HAMSTRINGS','Cable',null],
+['Slider Leg Curl','HAMSTRINGS','Bodyweight Only',null],
+['Glute Ham Raise','HAMSTRINGS','Machine',null],
 /* BACK */
 ['T-Bar Row','BACK','Machine','2025-10-04'],
 ['Seated Cable Row','BACK','Cable','2025-06-21'],
@@ -252,6 +268,22 @@ const CATALOG=[
 ['Barbell Bent Over Row','BACK','Barbell','2026-07-04'],
 ['Deadlift','BACK','Barbell','2026-07-04'],
 ['Back Extension','BACK','Bodyweight Loadable','2026-05-16'],
+/* BACK: added from the 2026-09-26 library review */
+['Barbell Row (Underhand Grip)','BACK','Barbell',null],
+['Rack Pull','BACK','Barbell',null],
+['Dumbbell Row (Single Arm)','BACK','Dumbbell',null],
+['Dumbbell Row (Incline Bench)','BACK','Dumbbell',null],
+['Cable Row (Wide Grip)','BACK','Cable',null],
+['Cable Row (Single Arm)','BACK','Cable',null],
+['Cable Straight-Arm Pulldown','BACK','Cable',null],
+['Pulldown (Parallel Grip)','BACK','Cable',null],
+['Pulldown (Underhand Grip)','BACK','Cable',null],
+['Pulldown (Single Arm)','BACK','Cable',null],
+['Chinup (Underhand Grip)','BACK','Bodyweight Only',null],
+['Chinup (Weighted)','BACK','Bodyweight Loadable',null],
+['Inverted Row','BACK','Bodyweight Only',null],
+['Pullup (Assisted)','BACK','Machine',null],
+['Machine Row (Seated)','BACK','Machine',null],
 /* GLUTES */
 ['Trap Bar Deadlift','GLUTES','Barbell','2025-07-18'],
 ['Romanian Deadlift','GLUTES','Barbell','2026-07-06'],
@@ -263,6 +295,19 @@ const CATALOG=[
 ['Belt Squat (Wide Stance)','GLUTES','Machine','2025-07-07'],
 ['Dumbbell Split Squat','GLUTES','Dumbbell','2025-11-08'],
 ['Bulgarian Split Squat (Glute-Focused)','GLUTES','Dumbbell','2025-11-19'],
+/* GLUTES: added from the 2026-09-26 library review */
+['Barbell Hip Thrust','GLUTES','Barbell',null],
+['Barbell Glute Bridge','GLUTES','Barbell',null],
+['Smith Machine Hip Thrust','GLUTES','Smith Machine',null],
+['Machine Hip Thrust','GLUTES','Machine',null],
+['Sumo Deadlift','GLUTES','Barbell',null],
+['Dumbbell Romanian Deadlift','GLUTES','Dumbbell',null],
+['Dumbbell Romanian Deadlift (Single Leg)','GLUTES','Dumbbell',null],
+['Dumbbell Reverse Lunge','GLUTES','Dumbbell',null],
+['Cable Pull-Through','GLUTES','Cable',null],
+['Cable Glute Kickback','GLUTES','Cable',null],
+['Machine Hip Abduction','GLUTES','Machine',null],
+['Back Raise (Glute-Focused)','GLUTES','Bodyweight Loadable',null],
 /* QUADS */
 ['Zercher Squat','QUADS','Barbell','2026-07-04'],
 ['Smith Machine Squat (Feet Forward)','QUADS','Smith Machine','2025-10-28'],
@@ -273,6 +318,18 @@ const CATALOG=[
 ['Front Squat','QUADS','Barbell','2025-11-20'],
 ['Barbell Squat (High Bar)','QUADS','Barbell','2026-06-03'],
 ['Bulgarian Split Squat (Quad-Focused)','QUADS','Dumbbell','2025-11-15'],
+/* QUADS: added from the 2026-09-26 library review */
+['Barbell Squat (Low Bar)','QUADS','Barbell',null],
+['Safety Bar Squat','QUADS','Barbell',null],
+['Hack Squat','QUADS','Machine',null],
+['Smith Machine Squat','QUADS','Smith Machine',null],
+['Belt Squat','QUADS','Machine',null],
+['Leg Press (Single Leg)','QUADS','Machine',null],
+['Leg Extension (Single Leg)','QUADS','Machine',null],
+['Goblet Squat (Heels Elevated)','QUADS','Dumbbell',null],
+['Dumbbell Walking Lunge','QUADS','Dumbbell',null],
+['Sissy Squat','QUADS','Bodyweight Only',null],
+['Dumbbell Split Squat (Quad-Focused)','QUADS','Dumbbell',null],
 /* CHEST */
 ['Pullover','CHEST','Dumbbell','2025-07-14'],
 ['Pushup (Narrow Grip)','CHEST','Bodyweight Only','2025-11-26'],
@@ -285,6 +342,22 @@ const CATALOG=[
 ['Dip (Chest-Focused)','CHEST','Bodyweight Only','2025-10-04'],
 ['Dip (Weighted, Chest-Focused)','CHEST','Bodyweight Loadable','2026-02-21'],
 ['Bench Press (Medium Grip)','CHEST','Barbell','2026-07-06'],
+/* CHEST: added from the 2026-09-26 library review */
+['Bench Press (Wide Grip)','CHEST','Barbell',null],
+['Bench Press (Incline)','CHEST','Barbell',null],
+['Bench Press (Decline)','CHEST','Barbell',null],
+['Dumbbell Press (Flat)','CHEST','Dumbbell',null],
+['Dumbbell Press (Low Incline)','CHEST','Dumbbell',null],
+['Dumbbell Flye (Flat)','CHEST','Dumbbell',null],
+['Dumbbell Flye (Incline)','CHEST','Dumbbell',null],
+['Cable Flye (High to Low)','CHEST','Cable',null],
+['Cable Flye (Low to High)','CHEST','Cable',null],
+['Cable Press (Standing)','CHEST','Cable',null],
+['Pushup (Normal Grip)','CHEST','Bodyweight Only',null],
+['Pushup (Deficit)','CHEST','Bodyweight Only',null],
+['Pushup (Weighted)','CHEST','Bodyweight Loadable',null],
+['Smith Machine Bench Press','CHEST','Smith Machine',null],
+['Smith Machine Press (Incline)','CHEST','Smith Machine',null],
 /* SHOULDERS */
 ['Smith Machine Shoulder Press (Seated)','SHOULDERS','Smith Machine','2025-06-24'],
 ['Machine Shoulder Press','SHOULDERS','Machine','2026-03-01'],
@@ -298,6 +371,22 @@ const CATALOG=[
 ['Dumbbell Lateral Raise','SHOULDERS','Dumbbell','2026-07-09'],
 ['Dumbbell Lateral Raise (Super ROM)','SHOULDERS','Dumbbell','2025-06-23'],
 ['Barbell Shoulder Press (Standing)','SHOULDERS','Barbell','2026-02-16'],
+/* SHOULDERS: added from the 2026-09-26 library review */
+['Dumbbell Lateral Raise (Seated)','SHOULDERS','Dumbbell',null],
+['Dumbbell Y-Raise (Incline Bench)','SHOULDERS','Dumbbell',null],
+['Cable Lateral Raise (Behind the Back)','SHOULDERS','Cable',null],
+['Dumbbell Rear Delt Raise (Bent Over)','SHOULDERS','Dumbbell',null],
+['Dumbbell Rear Delt Raise (Incline Bench)','SHOULDERS','Dumbbell',null],
+['Cable Rear Delt Flye','SHOULDERS','Cable',null],
+['Reverse Pec Deck','SHOULDERS','Machine',null],
+['Dumbbell Front Raise','SHOULDERS','Dumbbell',null],
+['Cable Front Raise','SHOULDERS','Cable',null],
+['Arnold Press','SHOULDERS','Dumbbell',null],
+['Barbell Shoulder Press (Seated)','SHOULDERS','Barbell',null],
+['Landmine Press','SHOULDERS','Barbell',null],
+['Barbell Upright Row','SHOULDERS','Barbell',null],
+['Dumbbell Upright Row','SHOULDERS','Dumbbell',null],
+['Dumbbell Lu Raise','SHOULDERS','Dumbbell',null],
 /* TRICEPS */
 ['Machine Triceps Extension','TRICEPS','Machine','2026-03-01'],
 ['EZ Bar Overhead Triceps Extension','TRICEPS','Barbell','2025-06-16'],
@@ -314,6 +403,16 @@ const CATALOG=[
 ['Cable Triceps Pushdown (Bar)','TRICEPS','Cable','2026-07-14'],
 ['Cable Triceps Pushdown (Rope)','TRICEPS','Cable','2026-01-26'],
 ['Bench Press (Close Grip)','TRICEPS','Barbell','2026-07-16'],
+/* TRICEPS: added from the 2026-09-26 library review */
+['Dumbbell Overhead Extension (Single Arm)','TRICEPS','Dumbbell',null],
+['Dumbbell Kickback','TRICEPS','Dumbbell',null],
+['Cable Kickback','TRICEPS','Cable',null],
+['Cable Triceps Pushdown (Single Arm)','TRICEPS','Cable',null],
+['Cable Triceps Pushdown (Underhand Grip)','TRICEPS','Cable',null],
+['Cable Overhead Triceps Extension (Bar)','TRICEPS','Cable',null],
+['Cable Lying Triceps Extension','TRICEPS','Cable',null],
+['JM Press','TRICEPS','Barbell',null],
+['Smith Machine JM Press','TRICEPS','Smith Machine',null],
 /* BICEPS */
 ['EZ Bar Curl (Narrow Grip)','BICEPS','Barbell','2026-02-21'],
 ['EZ Bar Curl (Normal Grip)','BICEPS','Barbell','2026-07-16'],
@@ -326,13 +425,42 @@ const CATALOG=[
 ['Cable Curl (EZ Bar)','BICEPS','Cable','2025-07-01'],
 ['Lying Cable Curl','BICEPS','Cable','2025-07-04'],
 ['Machine Preacher Curl','BICEPS','Machine','2026-03-01'],
+/* BICEPS: added from the 2026-09-26 library review */
+['Dumbbell Curl (Seated)','BICEPS','Dumbbell',null],
+['Dumbbell Preacher Curl','BICEPS','Dumbbell',null],
+['Dumbbell Spider Curl','BICEPS','Dumbbell',null],
+['Concentration Curl','BICEPS','Dumbbell',null],
+['Hammer Curl (Cross Body)','BICEPS','Dumbbell',null],
+['Cable Preacher Curl','BICEPS','Cable',null],
+['EZ Bar Preacher Curl','BICEPS','Barbell',null],
+['Barbell Curl (Narrow Grip)','BICEPS','Barbell',null],
 /* FOREARMS */
 ['Reverse Curl','FOREARMS','Barbell',null],
+/* FOREARMS: added from the 2026-09-26 library review */
+['Dumbbell Wrist Curl','FOREARMS','Dumbbell',null],
+['Barbell Wrist Curl','FOREARMS','Barbell',null],
+['Cable Wrist Curl','FOREARMS','Cable',null],
+['Dumbbell Reverse Wrist Curl','FOREARMS','Dumbbell',null],
+["Farmer's Carry",'FOREARMS','Dumbbell',null],
+/* TRAPS: new group, added from the 2026-09-26 library review */
+['Barbell Shrug','TRAPS','Barbell',null],
+['Dumbbell Shrug','TRAPS','Dumbbell',null],
+['Smith Machine Shrug','TRAPS','Smith Machine',null],
+['Machine Shrug','TRAPS','Machine',null],
+/* ABS: new group, added from the 2026-09-26 library review */
+['Cable Crunch','ABS','Cable',null],
+['Machine Crunch','ABS','Machine',null],
+['Hanging Leg Raise','ABS','Bodyweight Only',null],
+['Hanging Knee Raise','ABS','Bodyweight Only',null],
+['Lying Leg Raise','ABS','Bodyweight Only',null],
+['Ab Wheel Rollout','ABS','Bodyweight Only',null],
+['Decline Situp (Weighted)','ABS','Bodyweight Loadable',null],
+['Crunch (Weighted)','ABS','Bodyweight Loadable',null],
 ].map(([name,mg,equip,last])=>({name,mg,equip,last}));
 CATALOG.forEach(c=>c.home=isHome(c));
 const CAT_BY_NAME=Object.fromEntries(CATALOG.map(c=>[c.name,c]));
 /* the exercise library the UI offers: built-in catalog (custom exercises join here) */
-const libAll=()=>ST&&ST.custom?CATALOG.concat(ST.custom):CATALOG;
+const libAll=()=>ST&&ST.custom?CATALOG.concat(ST.custom.filter(c=>!CAT_BY_NAME[c.name])):CATALOG;
 const libByName=name=>CAT_BY_NAME[name]||(ST&&ST.custom||[]).find(c=>c.name===name);
 const EQUIP=['Barbell','Dumbbell','Cable','Machine','Smith Machine','Bodyweight Only','Bodyweight Loadable','Other'];
 

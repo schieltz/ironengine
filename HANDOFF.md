@@ -27,7 +27,7 @@ Live: https://schieltz.github.io/ironengine/
 - `ST.meso.dates`: session → local date its first set was logged (v4). Undated legacy sessions borrow the meso's latest known date at harvest.
 - `ST.draft`: meso under construction in Builder
 - `ST.archive`: finished mesos, kept whole (every set) with `archivedAt` when a draft is activated (v3). No browsing UI yet; included in backups.
-- `CATALOG`: 98 built-in exercises (owner's performed list from RP), each {name, mg, equip, last, home}
+- `CATALOG`: 213 built-in exercises, each {name, mg, equip, last, home}: 98 from the owner's RP history (with last-performed dates) plus 115 he approved in the 2026-09-26 library review (`last: null`; decisions pinned in `tests/fixtures/library-review-2026-09-26.json`). 12 muscle groups (`MGS`), including TRAPS and ABS from that review.
 - `ST.custom`: exercises the owner creates, {name, mg, equip, home, last: null, custom: true} (v6). `libAll()` / `libByName()` = catalog + custom; everything the UI offers goes through them. Names are permanent (history is keyed by name) and can't contain `" < > \\`. A custom exercise can be deleted only while unused in the current meso and draft.
 - `TEMPLATES`: 6 RP meso blueprints; slots [MG, priority, optionalPinnedExercise]
 
@@ -65,7 +65,6 @@ RIR ramp: 3/2/2/1/0 + deload 8. Days: Mon/Wed/Fri.
 5. Situations worth catching (they settle open questions): an exercise skipped entirely (R6 set count); a later set at ≤4 reps (R3 floor); a later set 3+ reps below set 1 but above 4 (R3 drop trigger); a manually added set (R2 interaction); each feedback extreme (moderate pain, still sore, too much, not enough, never sore + low pump); every deload day.
 
 ## Known gaps / roadmap candidates
-- Library expansion: 125 exercises drafted (RP-style names; 112 across the existing groups plus optional new TRAPS and ABS groups), awaiting owner review at https://claude.ai/artifact/BXzXRRu92F4aBjGEfnLJzq (decisions saved to its db doc `review/library-draft`). Merge = add the kept names to `CATALOG` (`last: null`), extend `HOME_MACHINES` with 'Leg Extension (Single Leg)' and 'Seated Leg Curl (Single Leg)', and add TRAPS/ABS to `MGS` plus a `--mg-ABS` color if approved
 - Exercise detail view (tap an exercise → every past session from the current meso and `ST.archive`) not built yet
 - R2/R5/R8 coefficients unvalidated — owner is parallel-logging in RP for one meso to calibrate; expect tuning PRs
 - No rep-range targets per exercise type (RP likely varies floor by compound/isolation)
