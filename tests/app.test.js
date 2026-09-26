@@ -894,3 +894,69 @@ describe('added exercises join their muscle group (#3)', () => {
     assert.equal(names(app.state(), 'w2d3').at(-1), 'Dumbbell Shrug');
   });
 });
+
+describe('training days can be any weekday (#1)', () => {
+  const SAT = Date.parse('2026-09-26T15:00:00Z');                    // a Saturday everywhere in the Americas/Europe
+  const label = (app, w, d) => app.run(`dayLabel(${w},${d})`);
+  const pick = (app, day, every) => app.call(`openDayPicker(); dayPick.label="${day}"; dayPick.every=${every}; await saveDayPick();`);
+
+  test('a session shows the weekday you actually trained it once you log a set', async () => {
+    const app = await bootApp({ now: SAT });
+    await app.call('selDay=1; await pickWeek(3);');
+    assert.equal(label(app, 3, 1), 'Mon');                          // planned
+    await app.call('await tapLog(0,0);');
+    assert.equal(label(app, 3, 1), 'Sat');
+    assert.match(app.els.get('daytabs').innerHTML, /Sat ▾/);
+    assert.match(app.els.get('hSub').textContent, /^Sat · /);
+  });
+
+  test('tapping the selected day tab opens the picker; other tabs just switch days', async () => {
+    const app = await bootApp({ now: SAT });
+    const tabs = app.els.get('daytabs').innerHTML;
+    assert.match(tabs, /onclick="openDayPicker\(\)"/);
+    assert.match(tabs, /onclick="pickDay\(1\)"/);
+    await app.call('openDayPicker();');
+    assert.match(app.els.get('modalRoot').innerHTML, /Which day of the week is this session\?/);
+  });
+
+  test('"this week only" relabels one session; the plan stays', async () => {
+    const app = await bootApp({ now: SAT });
+    await app.call('selDay=1; await pickWeek(3);');
+    await pick(app, 'Sat', false);
+    assert.equal(label(app, 3, 1), 'Sat');
+    assert.equal(label(app, 4, 1), 'Mon');
+    assert.deepEqual(Array.from(app.run('ST.meso.schedule')), ['Mon', 'Wed', 'Fri']);
+  });
+
+  test('"every week" changes the plan for that training day', async () => {
+    const app = await bootApp({ now: SAT });
+    await app.call('selDay=1; await pickWeek(3);');
+    await pick(app, 'Sun', true);
+    assert.equal(label(app, 3, 1), 'Sun');
+    assert.equal(label(app, 5, 1), 'Sun');
+    assert.equal(label(app, 5, 2), 'Wed');
+  });
+
+  test('a label you pick beats the logged date (e.g. logging a session a day late)', async () => {
+    const app = await bootApp({ now: SAT });
+    await app.call('selDay=1; await pickWeek(3); await tapLog(0,0);');
+    await pick(app, 'Fri', false);
+    assert.equal(label(app, 3, 1), 'Fri');
+  });
+
+  test('a new meso keeps your weekday plan', async () => {
+    const app = await bootApp({ now: SAT, confirm: () => true });
+    await app.call('selDay=2; await pickWeek(3);');
+    await pick(app, 'Thu', true);
+    await app.call('await makeDraft(); await activateDraft();');
+    assert.deepEqual(Array.from(app.run('ST.meso.schedule')), ['Mon', 'Thu', 'Fri']);
+  });
+
+  test('older saves upgrade to the default Mon/Wed/Fri plan', async () => {
+    const ls = fakeLocalStorage();
+    ls.data.set('ironengine:state2', JSON.stringify(v4State()));
+    const st = (await bootApp({ now: SAT, localStorage: ls })).state();
+    assert.deepEqual(st.meso.schedule, ['Mon', 'Wed', 'Fri']);
+    assert.deepEqual(st.meso.dayOf, {});
+  });
+});

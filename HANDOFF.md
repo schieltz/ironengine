@@ -18,7 +18,8 @@ Live: https://schieltz.github.io/ironengine/
 
 ## Data model
 - Saved state `{v, meso, hist, draft, archive, custom}` under key `state2`. `v` = schema version; unversioned saves are v1. Changing the stored shape = bump `SCHEMA_VERSION`, append a step to `MIGRATIONS`, update `seedState()`, add a migration test. `migrate()` runs on load; upgraded state is saved immediately.
-- `ST.meso`: {name, weeks, curWeek, curDay, days[3][slots], seq, log{wNdM: [entries]}, dates{wNdM: date}}
+- `ST.meso`: {name, weeks, curWeek, curDay, days[3][slots], seq, log{wNdM: [entries]}, dates{wNdM: date}, schedule[3], dayOf{wNdM: weekday}}
+- Weekday labels (v7): `dayLabel(w,d)` = the session's own label (`dayOf`, set from the day picker) → else the weekday of its logged date → else `schedule[d-1]` (the plan; default Mon/Wed/Fri, inherited by the next meso). Tap the selected day tab to pick a weekday, for this session only or every week. Training days stay ordinal (Day 1-3); labels are display only.
 - slot (the plan for sessions not yet started): {id, name, mg, equip, note, pri}. `id` is permanent within the meso (`s1`, `s2`, … from `seq`).
 - entry (one exercise in one session, display order): {slot, name, sets, why, fb, u?}. `name` can differ from the slot's (a one-off swap). `fb` = feedback given in that session {soreness, pain, pump, workload}; it shapes only the next week's prescription for that slot. `u` = entry-level touch (swapped or added by hand). v5; before that, sessions were arrays lined up with the plan by position.
 - set: {w, reps, tgt, rir, st: 'logged'|'skipped'|null, u?: 1}. `u` = user-touched (edited, tapped, or manually added).
@@ -46,7 +47,7 @@ Live: https://schieltz.github.io/ironengine/
 | Weight change | Set's weight edited before logging (no reps typed) → rep target re-derived for equal effort at the week's RIR: Epley on reps-to-failure, `RULES.epley`=30, measured from the originally prescribed weight/target (`pw`/`ptgt` on the set); hint line under the set | Inferred (owner request 2026-09-26); calibrate vs RP |
 | Seeding | Wk 1 from hist; >8 wks stale → −10%; maintenance-priority slots start 1 set, full 2 | Design decision |
 
-RIR ramp: 3/2/2/1/0 + deload 8. Days: Mon/Wed/Fri.
+RIR ramp: 3/2/2/1/0 + deload 8. Three training days per week; weekday labels are editable (see Data model).
 
 ## Calibration evidence
 **Owner's logging habit (confirmed 2026-09-26):** adjusts weights, reps and sets by feel, especially adding early in a meso. So logged history is NOT evidence of what RP prescribed; only skipped sets (which keep RP's prescribed values in RP's day view) and screenshots of RP's targets taken before training count as ground truth.

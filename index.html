@@ -132,6 +132,8 @@ nav button.active{color:var(--blue)}
   font-size:16px;color:var(--ink);min-height:44px}
 .form-input:focus{outline:none;border-color:var(--blue)}
 .chip-wrap{display:flex;flex-wrap:wrap;gap:6px}
+.check-row{display:flex;align-items:center;gap:12px;min-height:48px;margin-top:12px;font-size:14px;font-weight:600}
+.check-row input{width:22px;height:22px;accent-color:var(--blue);margin:0}
 .form-err{color:var(--red);font-size:13px;margin-top:8px;min-height:18px}
 .badge-gym{font-size:9px;font-weight:800;letter-spacing:.6px;background:#33231B;color:#C98B5C;
   border-radius:5px;padding:2px 6px;margin-left:6px;vertical-align:middle}
@@ -212,7 +214,8 @@ const store = {
   set(k,v){ return this.setRaw(k,JSON.stringify(v)); }
 };
 store.init();
-const DAYS=['Mon','Wed','Fri'];
+const DAYS=['Mon','Wed','Fri'];   /* default weekday for each training day; a meso keeps its own in meso.schedule */
+const WEEKDAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 const MGS=['CHEST','BACK','SHOULDERS','TRICEPS','BICEPS','QUADS','GLUTES','HAMSTRINGS','CALVES','TRAPS','FOREARMS','ABS'];
 
 /* ---------- exercise catalog ----------
@@ -514,7 +517,7 @@ function seedState(){
   let seq=0;
   const ex=(name,note)=>{const c=CAT_BY_NAME[name]||{mg:'BACK',equip:'?'};
     return {id:'s'+(++seq),name,mg:c.mg,equip:c.equip,note:note||null,pri:1};};
-  const meso={name:'New meso plan',weeks:5,curWeek:2,curDay:3,days:[[],[],[]],log:{},
+  const meso={name:'New meso plan',weeks:5,curWeek:2,curDay:3,days:[[],[],[]],log:{},schedule:[...DAYS],dayOf:{},
     dates:{w1d3:'2026-07-09',w2d3:'2026-07-19'}};   /* from RP exercise-history screenshots */
   meso.days[0]=[ex('Dip (Weighted, Triceps-Focused)'),ex('Cable Triceps Pushdown (Bar)'),
     ex('Cable Upright Row'),ex('Cable Curl','Straight bar'),ex('Bench Press (Medium Grip)'),ex('Romanian Deadlift')];
@@ -547,7 +550,7 @@ function seedState(){
    Saved state carries v; unversioned saves are v1. To change the stored shape:
    bump SCHEMA_VERSION, append the upgrade step to MIGRATIONS, update seedState(),
    and add a migration test. */
-const SCHEMA_VERSION=6;
+const SCHEMA_VERSION=7;
 const MIGRATIONS=[   /* MIGRATIONS[n-1] upgrades a v(n) state to v(n+1), in place */
   /* v1→v2: feedback moves off the exercise (where it applied to every later week) into
      meso.fb[session][exercise]. A legacy answer is attributed to the latest week of that
@@ -599,6 +602,9 @@ const MIGRATIONS=[   /* MIGRATIONS[n-1] upgrades a v(n) state to v(n+1), in plac
   },
   /* v5→v6: exercises you create live in ST.custom and join the built-in catalog */
   s=>{ s.custom=s.custom||[]; },
+  /* v6→v7: training days get weekday labels you can change: meso.schedule (the plan, per day)
+     and meso.dayOf (one session's own label) */
+  s=>{ s.meso.schedule=s.meso.schedule||[...DAYS]; s.meso.dayOf=s.meso.dayOf||{}; },
 ];
 function migrate(s){
   let v=s.v||1;
@@ -788,6 +794,13 @@ async function startFresh(){
   await ensureDay(selWeek,selDay); await save(); view='workout'; render();
 }
 function key(w,d){ return `w${w}d${d}`; }
+/* Weekday shown for a session: the label you picked for it, else the weekday you actually trained it
+   (from its logged date), else the plan's weekday for that training day. */
+function weekdayOf(iso){ const [y,m,d]=iso.split('-').map(Number); return WEEKDAYS[(new Date(y,m-1,d).getDay()+6)%7]; }
+function dayLabel(w,d){
+  const M=ST.meso, k=key(w,d);
+  return M.dayOf[k]||(M.dates[k]?weekdayOf(M.dates[k]):M.schedule[d-1]);
+}
 /* local calendar date; toISOString() is UTC, which stamps US evening sessions as tomorrow */
 function localDate(d=new Date()){
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
@@ -826,7 +839,7 @@ function prescribeEntry(w,d,e){
     if(!pe||pe.name!==e.name||!pe.sets) continue;
     if(pw===w-1){
       const p=prescribe(e,pe.sets,w,pe.fb||null);
-      if(!pe.sets.some(s=>s.st)) p.why=`Preview: ${DAYS[d-1]} week ${w-1} isn't logged yet, so this repeats its weights `
+      if(!pe.sets.some(s=>s.st)) p.why=`Preview: day ${d} of week ${w-1} isn't logged yet, so this repeats its weights `
         +`at <b>${rirFor(w)} RIR</b>${w>RIR_RAMP.length?', half the sets (deload)':''}. Updates automatically once you log it.`;
       return p;
     }
@@ -858,7 +871,7 @@ function renderHeader(){
   const M=ST.meso;
   const titles={workout:`WEEK ${selWeek} <span class="dim">DAY ${selDay}</span>`,library:'LIBRARY',
     builder:'MESO BUILDER',engine:'THE ENGINE',data:'DATA'};
-  const subs={workout:`${DAYS[selDay-1]} · ${M.name} · target ${rirFor(selWeek)} RIR`,
+  const subs={workout:`${dayLabel(selWeek,selDay)} · ${M.name} · target ${rirFor(selWeek)} RIR`,
     library:`${libAll().length} exercises · ${ST.custom.length} of them yours`,
     builder: ST.draft?`Draft: ${ST.draft.name}`:'Plan your next mesocycle',
     engine:'Every number, explained. No black box.',data:'Export, reset, storage'};
@@ -877,16 +890,41 @@ function renderSpine(){
 function renderTabs(){
   const el=$('daytabs'); const M=ST.meso;
   if(view!=='workout'){ el.innerHTML=''; return; }
-  el.innerHTML=DAYS.map((d,i)=>{
-    const k=key(selWeek,i+1), log=M.log[k];
+  el.innerHTML=DAYS.map((_,i)=>{
+    const k=key(selWeek,i+1), log=M.log[k], d=dayLabel(selWeek,i+1), active=i+1===selDay;
     let st='—';
     if(log&&log.length){
       const flat=log.flatMap(e=>e.sets||[]), done=flat.filter(s=>s.st).length;
       st=done===flat.length&&done>0?'COMPLETE':done>0?`${done}/${flat.length}`:'PLANNED';
     }
     const stCls=st==='COMPLETE'?'complete':(st!=='—'&&st!=='PLANNED'?'partial':'');
-    return `<button class="${i+1===selDay?'active':''} ${stCls}" onclick="pickDay(${i+1})">${d}<span class="st">${st}</span></button>`;
+    return `<button class="${active?'active':''} ${stCls}" onclick="${active?'openDayPicker()':`pickDay(${i+1})`}"
+      ${active?'aria-label="Change the weekday for this session"':''}>${d}${active?' ▾':''}<span class="st">${st}</span></button>`;
   }).join('');
+}
+/* Tap the selected day tab to set which weekday this session is on: this week only, or every week. */
+let dayPick=null;
+function openDayPicker(){ dayPick={label:dayLabel(selWeek,selDay),every:false}; renderDayPicker(); }
+function renderDayPicker(){
+  $('modalRoot').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeDayPicker()"><div class="sheet">
+    <h2>Day ${selDay}, week ${selWeek}</h2>
+    <p class="sheet-p">Which day of the week is this session?</p>
+    <div class="chip-wrap" style="margin-top:12px">${WEEKDAYS.map(d=>`<button class="chip ${dayPick.label===d?'sel':''}"
+      onclick="dayPick.label='${d}';renderDayPicker()">${d}</button>`).join('')}</div>
+    <label class="check-row"><input type="checkbox" id="dayEvery" ${dayPick.every?'checked':''}
+      onchange="dayPick.every=this.checked"> Every week (change the plan for day ${selDay})</label>
+    <div class="sheet-actions">
+      <button class="btn-ghost" onclick="closeDayPicker()">Cancel</button>
+      <button class="btn-primary" onclick="saveDayPick()">Save</button>
+    </div></div></div>`;
+}
+function closeDayPicker(){ $('modalRoot').innerHTML=''; dayPick=null; }
+async function saveDayPick(){
+  const M=ST.meso, {label,every}=dayPick;
+  M.dayOf[key(selWeek,selDay)]=label;
+  if(every) M.schedule[selDay-1]=label;
+  closeDayPicker(); await save(); render();
+  toast(every?`Day ${selDay} is ${label} from now on`:`This session is on ${label}`);
 }
 async function pickWeek(w){ selWeek=w; await ensureDay(w,selDay); render(); }
 async function pickDay(d){ selDay=d; await ensureDay(selWeek,d); render(); }
@@ -1074,7 +1112,7 @@ function renderBuilder(){
       <div class="mg-tag" style="background:var(--panel2);color:var(--ink-dim)">TEMPLATE LIBRARY</div>
       ${TEMPLATES.map((t,i)=>`<button class="slot" onclick="makeDraftFromTemplate(${i})">
         <span class="li-main"><span class="li-name">${t.name}</span>
-        <span class="li-sub">${t.days.map((d,j)=>DAYS[j]+' '+d.length).join(' · ')} slots ·
+        <span class="li-sub">${t.days.map((d,j)=>ST.meso.schedule[j]+' '+d.length).join(' · ')} slots ·
         ${t.days.flat().filter(s=>s[1]===0).length} maintenance</span></span>
         <span class="swap">Use ›</span></button>`).join('')}`;
     return;
@@ -1082,7 +1120,7 @@ function renderBuilder(){
   const D=ST.draft, dayExs=D.days[bdDay-1];
   let lastMg='';
   $('main').innerHTML=`
-    <div class="bd-tabs">${DAYS.map((d,i)=>`<button class="${bdDay===i+1?'active':''}"
+    <div class="bd-tabs">${ST.meso.schedule.map((d,i)=>`<button class="${bdDay===i+1?'active':''}"
       onclick="bdDay=${i+1};render()">${d}</button>`).join('')}</div>
     ${dayExs.map((ex,i)=>{
       const tag=ex.mg!==lastMg?`<span class="mg-tag" style="background:var(--mg-${ex.mg})">${ex.mg}</span>`:'';
@@ -1134,7 +1172,7 @@ function renderSwap(){
   $('modalRoot').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeSwap()">
     <div class="sheet">
       ${c.exclude?`<h2>Swap exercise</h2><p class="sheet-p">Replacing <b>${c.exclude}</b></p>`
-        :`<h2>Add exercise</h2><p class="sheet-p">To ${DAYS[(c.mode==='draftAdd'?bdDay:selDay)-1]}</p>`}
+        :`<h2>Add exercise</h2><p class="sheet-p">To ${c.mode==='draftAdd'?ST.meso.schedule[bdDay-1]:dayLabel(selWeek,selDay)}</p>`}
       <div class="lib-search" style="margin:10px 0 6px"><input placeholder="Search" value="${escHtml(c.q)}"
         oninput="swapCtx.q=this.value;renderSwapList()"></div>
       <div class="chiprow">
@@ -1220,7 +1258,7 @@ async function removeEntry(ei){
   const M=ST.meso, log=M.log[key(selWeek,selDay)], e=log[ei], plan=M.days[selDay-1];
   const inPlan=plan.some(s=>s.id===e.slot), logged=(e.sets||[]).some(s=>s.st==='logged');
   if(!inPlan&&logged){ toast('Already logged today, so it stays'); return; }
-  if(!confirm(inPlan?`Remove ${e.name} from ${DAYS[selDay-1]} for the rest of the meso?${logged?' The sets you logged today stay.':''}`
+  if(!confirm(inPlan?`Remove ${e.name} from day ${selDay} for the rest of the meso?${logged?' The sets you logged today stay.':''}`
     :`Remove ${e.name} from today?`)) return;
   if(inPlan) M.days[selDay-1]=plan.filter(s=>s.id!==e.slot);
   if(!logged) log.splice(ei,1);
@@ -1230,7 +1268,7 @@ function openAdd(){ swapCtx={mode:'add',mg:'ALL',home:true,q:'',exclude:null}; r
 function chooseAddScope(name){
   $('modalRoot').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeSwap()"><div class="sheet">
     <h2>Add exercise</h2>
-    <p class="sheet-p"><b>${name}</b> → ${DAYS[selDay-1]}</p>
+    <p class="sheet-p"><b>${name}</b> → ${dayLabel(selWeek,selDay)}</p>
     <div class="sheet-stack">
       <button class="btn-primary" onclick="addEntry('${esc(name)}','today')">Just today</button>
       <button class="btn-ghost" onclick="addEntry('${esc(name)}','meso')">Today + rest of meso</button>
@@ -1250,7 +1288,7 @@ async function addEntry(name,scope){
   log.splice(afterGroup(log,x=>exInfo(x.name,slotOf(selDay,x)).mg,c.mg),0,e);
   const p=prescribeEntry(selWeek,selDay,e); e.sets=p.sets; e.why=p.why;
   closeSwap(); await ensureDay(selWeek,selDay); await save(); render();
-  toast(scope==='today'?`${c.name} added for today`:`${c.name} added to ${DAYS[selDay-1]}`);
+  toast(scope==='today'?`${c.name} added for today`:`${c.name} added to day ${selDay}`);
 }
 
 /* A note belongs to the plan slot, so it shows every week this exercise is done in that slot. */
@@ -1381,7 +1419,7 @@ async function draftAdd(name){
   const c=libByName(name);
   const a=ST.draft.days[bdDay-1];
   a.splice(afterGroup(a,s=>s.mg,c.mg),0,{name:c.name,mg:c.mg,equip:c.equip,note:null,pri:1,_swapped:true});
-  closeSwap(); await save(); render(); toast(`${c.name} added to ${DAYS[bdDay-1]}`);
+  closeSwap(); await save(); render(); toast(`${c.name} added to ${ST.meso.schedule[bdDay-1]}`);
 }
 async function discardDraft(){
   if(!confirm('Discard this draft? The current meso is not affected.')) return;
@@ -1409,7 +1447,7 @@ async function activateDraft(){
   let seq=0;
   ST.meso={name:D.name.replace(' (draft)','')+' · '+localDate(),weeks:D.weeks,curWeek:1,curDay:1,
     days:D.days.map(day=>day.map(ex=>({id:'s'+(++seq),name:ex.name,mg:ex.mg,equip:ex.equip,note:ex.note,pri:ex.pri??1}))),
-    log:{},dates:{},seq};
+    log:{},dates:{},seq,schedule:[...ST.meso.schedule],dayOf:{}};
   ST.draft=null; selWeek=1; selDay=1;
   await ensureDay(1,1); await save();
   view='workout'; render(); toast('New meso active — history carried forward');
