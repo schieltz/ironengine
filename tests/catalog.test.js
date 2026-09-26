@@ -56,3 +56,32 @@ describe('exercise catalog', () => {
     assert.match(app.els.get('libList').innerHTML, /Cable Crunch/);
   });
 });
+
+describe('search finds exercises the way you type them', () => {
+  const cases = [
+    ['skull crusher', 'EZ Bar Skullcrusher'],
+    ['weighted dips', 'Dip (Weighted, Triceps-Focused)'],
+    ['weighted dips', 'Dip (Weighted, Chest-Focused)'],
+    ['seated row', 'Seated Cable Row'],
+    ['narrow grip bench', 'Bench Press (Close Grip)'],
+    ['nordic', 'Nordic Curl'],
+    ['rdl', 'Romanian Deadlift'],
+    ['db lateral raises', 'Dumbbell Lateral Raise'],
+    ['chin up', 'Chinup (Underhand Grip)'],
+    ['45 degree', 'Back Raise (45 degree)'],
+  ];
+  for (const [q, name] of cases) {
+    test(`"${q}" finds ${name}`, async () => {
+      const app = await bootApp({ now: NOW });
+      assert.equal(app.run(`matchesQuery(${JSON.stringify(name)}, ${JSON.stringify(q)})`), true);
+    });
+  }
+
+  test('every word must match, so results stay narrow', async () => {
+    const app = await bootApp({ now: NOW });
+    const hits = q => Array.from(app.run(`CATALOG.filter(c => matchesQuery(c.name, ${JSON.stringify(q)})).map(c => c.name)`));
+    assert.deepEqual(hits('weighted dips').sort(), ['Dip (Weighted, Chest-Focused)', 'Dip (Weighted, Triceps-Focused)']);
+    assert.deepEqual(hits('narrow grip bench'), ['Bench Press (Close Grip)']);
+    assert.ok(!hits('seated row').includes('Seated Leg Curl'));
+  });
+});

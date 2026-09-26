@@ -462,6 +462,15 @@ const CAT_BY_NAME=Object.fromEntries(CATALOG.map(c=>[c.name,c]));
 /* the exercise library the UI offers: built-in catalog (custom exercises join here) */
 const libAll=()=>ST&&ST.custom?CATALOG.concat(ST.custom.filter(c=>!CAT_BY_NAME[c.name])):CATALOG;
 const libByName=name=>CAT_BY_NAME[name]||(ST&&ST.custom||[]).find(c=>c.name===name);
+/* Search: every typed word must appear in the name, in any order, ignoring case and punctuation.
+   Plurals find singulars ("dips" → Dip) and a few gym synonyms are understood. */
+const SEARCH_SYNONYMS={narrow:['close'],close:['narrow'],db:['dumbbell'],bb:['barbell'],rdl:['romanian'],ez:['ez bar']};
+const searchNorm=s=>' '+s.toLowerCase().replace(/[^a-z0-9]+/g,' ').trim()+' ';
+function matchesQuery(name,q){
+  const hay=searchNorm(name), words=searchNorm(q).trim().split(' ').filter(Boolean);
+  return words.every(w=>[w,...(w.length>3&&w.endsWith('s')?[w.slice(0,-1)]:[]),...(w.length>4&&w.endsWith('es')?[w.slice(0,-2)]:[]),
+    ...(SEARCH_SYNONYMS[w]||[])].some(v=>hay.includes(v)));
+}
 const EQUIP=['Barbell','Dumbbell','Cable','Machine','Smith Machine','Bodyweight Only','Bodyweight Loadable','Other'];
 
 /* ---------- meso template library (from RP Templates tab) ----------
@@ -1004,7 +1013,7 @@ function renderLibraryList(){
   const list=libAll().filter(c=>
     (libMg==='ALL'||c.mg===libMg) &&
     (!libHome||c.home) &&
-    (!libQ||c.name.toLowerCase().includes(libQ.toLowerCase())));
+    (!libQ||matchesQuery(c.name,libQ)));
   list.sort((a,b)=>a.name.localeCompare(b.name));
   $('libList').innerHTML=`
     ${list.map(c=>{
@@ -1107,7 +1116,7 @@ function renderSwap(){
 function renderSwapList(){
   const c=swapCtx;
   const list=libAll().filter(x=>x.name!==c.exclude&&(c.mg==='ALL'||x.mg===c.mg)&&(!c.home||x.home)
-    &&(!c.q||x.name.toLowerCase().includes(c.q.toLowerCase())));
+    &&(!c.q||matchesQuery(x.name,c.q)));
   list.sort((a,b)=>a.name.localeCompare(b.name));
   $('swapList').innerHTML=list.map(x=>{const h=ST.hist[x.name];
     return `<button class="lib-item" onclick="doSwap('${esc(x.name)}')">
