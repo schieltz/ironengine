@@ -63,6 +63,7 @@ main{padding:6px 12px}
 .why{margin-top:4px;font-size:11.5px;color:var(--ink-faint);padding:0 2px;line-height:1.45}
 .why b{color:var(--blue);font-weight:700}
 .card-actions{display:flex;gap:8px;margin-top:10px}
+.card-actions button.more{flex:0 0 48px;font-size:17px;letter-spacing:1px}
 .card-actions button{flex:1;padding:9px;border-radius:9px;background:var(--panel2);border:1px solid var(--line);
   font-size:12.5px;font-weight:700;color:var(--ink-dim);text-align:center}
 .fb-done{border-color:var(--green)!important;color:var(--green)!important}
@@ -322,6 +323,9 @@ const CATALOG=[
 ].map(([name,mg,equip,last])=>({name,mg,equip,last}));
 CATALOG.forEach(c=>c.home=isHome(c));
 const CAT_BY_NAME=Object.fromEntries(CATALOG.map(c=>[c.name,c]));
+/* the exercise library the UI offers: built-in catalog (custom exercises join here) */
+const libAll=()=>CATALOG;
+const libByName=name=>CAT_BY_NAME[name];
 
 /* ---------- meso template library (from RP Templates tab) ----------
    slot: [MG, pri] — pri 1 = full priority (start 2 sets), 0 = maintenance (start 1 set)
@@ -683,7 +687,7 @@ function prescribeEntry(w,d,e){
 function effectiveHist(w,d){ const h={...ST.hist}; harvestHistory(ST.meso,h,w*10+d); return h; }
 const slotOf=(d,e)=>ST.meso.days[d-1].find(s=>s.id===e.slot);
 /* display info: the plan slot when it matches (keeps per-meso muscle tags), else the catalog */
-const exInfo=(name,slot)=>slot&&slot.name===name?slot:(CAT_BY_NAME[name]||{name,mg:'BACK',equip:'?'});
+const exInfo=(name,slot)=>slot&&slot.name===name?slot:(libByName(name)||{name,mg:'BACK',equip:'?'});
 const entryAt=ei=>ST.meso.log[key(selWeek,selDay)][ei];
 
 function render(){
@@ -750,6 +754,7 @@ function renderWorkout(){
         <button onclick="addSet(${i})">+ Set</button>
         ${sets.some(s=>!s.st)?`<button onclick="skipRest(${i})">Skip rest</button>`:''}
         <button class="${e.fb?'fb-done':''}" onclick="openFeedback(${i})">${e.fb?'✓ Feedback':'Feedback'}</button>
+        <button class="more" onclick="openExMenu(${i})" aria-label="Exercise options">⋯</button>
       </div>
     </div>`;
   });
@@ -841,27 +846,33 @@ async function saveFB(){
 }
 
 /* ---------- library ---------- */
+/* Search boxes re-render only their result list, so the phone keyboard stays open while typing. */
 function renderLibrary(){
-  const list=CATALOG.filter(c=>
-    (libMg==='ALL'||c.mg===libMg) &&
-    (!libHome||c.home) &&
-    (!libQ||c.name.toLowerCase().includes(libQ.toLowerCase())));
-  list.sort((a,b)=>a.name.localeCompare(b.name));
   $('main').innerHTML=`
-    <div class="lib-search"><input placeholder="Search ${CATALOG.length} exercises" value="${libQ}"
-      oninput="libQ=this.value;renderLibrary()"></div>
+    <div class="lib-search"><input placeholder="Search ${libAll().length} exercises" value="${escHtml(libQ)}"
+      oninput="libQ=this.value;renderLibraryList()"></div>
     <div class="chiprow">
       <button class="chip home ${libHome?'sel':''}" onclick="libHome=!libHome;renderLibrary()">⌂ Home only</button>
       <button class="chip ${libMg==='ALL'?'sel':''}" onclick="libMg='ALL';renderLibrary()">All</button>
       ${MGS.map(m=>`<button class="chip ${libMg===m?'sel':''}" onclick="libMg='${m}';renderLibrary()">${cap(m)}</button>`).join('')}
     </div>
+    <div id="libList"></div>`;
+  renderLibraryList();
+}
+function renderLibraryList(){
+  const list=libAll().filter(c=>
+    (libMg==='ALL'||c.mg===libMg) &&
+    (!libHome||c.home) &&
+    (!libQ||c.name.toLowerCase().includes(libQ.toLowerCase())));
+  list.sort((a,b)=>a.name.localeCompare(b.name));
+  $('libList').innerHTML=`
     ${list.map(c=>{
       const h=ST.hist[c.name];
-      return `<button class="lib-item" onclick="toast('${esc(c.name)} — last: ${c.last}${h?' @ '+h.w:''}')">
+      return `<button class="lib-item" onclick="toast('${esc(c.name)}${c.last?' — last: '+c.last:''}${h?' @ '+h.w:''}')">
         <span class="dot" style="background:var(--mg-${c.mg})"></span>
         <span class="li-main"><span class="li-name">${c.name}${c.home?'':'<span class="badge-gym">GYM</span>'}</span>
         <span class="li-sub">${cap(c.mg)} · ${c.equip}</span></span>
-        <span class="li-right">${h?`<div class="li-w">${h.w}</div>`:''}<div class="li-date">${c.last}</div></span>
+        <span class="li-right">${h?`<div class="li-w">${h.w}</div>`:''}<div class="li-date">${c.last||''}</div></span>
       </button>`;}).join('')||'<p style="color:var(--ink-faint);padding:20px;text-align:center">No matches</p>'}`;
 }
 
@@ -928,38 +939,93 @@ async function makeDraftFromTemplate(ti){
   toast('Slots auto-filled — tap any to swap');
 }
 function openSwap(slotIdx){
-  swapCtx={slotIdx,mg:ST.draft.days[bdDay-1][slotIdx].mg,home:true,q:''};
+  swapCtx={mode:'draft',slotIdx,mg:ST.draft.days[bdDay-1][slotIdx].mg,home:true,q:'',
+    exclude:ST.draft.days[bdDay-1][slotIdx].name};
   renderSwap();
 }
 function renderSwap(){
   const c=swapCtx;
-  const list=CATALOG.filter(x=>(c.mg==='ALL'||x.mg===c.mg)&&(!c.home||x.home)
-    &&(!c.q||x.name.toLowerCase().includes(c.q.toLowerCase())));
-  list.sort((a,b)=>a.name.localeCompare(b.name));
   $('modalRoot').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeSwap()">
     <div class="sheet">
       <h2>Swap exercise</h2>
-      <div class="lib-search" style="margin:10px 0 6px"><input placeholder="Search" value="${c.q}"
-        oninput="swapCtx.q=this.value;renderSwap()"></div>
+      <p class="sheet-p">Replacing <b>${c.exclude}</b></p>
+      <div class="lib-search" style="margin:10px 0 6px"><input placeholder="Search" value="${escHtml(c.q)}"
+        oninput="swapCtx.q=this.value;renderSwapList()"></div>
       <div class="chiprow">
         <button class="chip home ${c.home?'sel':''}" onclick="swapCtx.home=!swapCtx.home;renderSwap()">⌂ Home only</button>
         <button class="chip ${c.mg==='ALL'?'sel':''}" onclick="swapCtx.mg='ALL';renderSwap()">All muscles</button>
         ${MGS.map(m=>`<button class="chip ${c.mg===m?'sel':''}" onclick="swapCtx.mg='${m}';renderSwap()">${cap(m)}</button>`).join('')}
       </div>
-      ${list.map(x=>{const h=ST.hist[x.name];
-        return `<button class="lib-item" onclick="doSwap('${esc(x.name)}')">
-        <span class="dot" style="background:var(--mg-${x.mg})"></span>
-        <span class="li-main"><span class="li-name">${x.name}${x.home?'':'<span class="badge-gym">GYM</span>'}</span>
-        <span class="li-sub">${cap(x.mg)} · ${x.equip}</span></span>
-        <span class="li-right">${h?`<div class="li-w">${h.w}</div>`:''}<div class="li-date">${x.last}</div></span>
-        </button>`;}).join('')}
+      <div id="swapList"></div>
     </div></div>`;
+  renderSwapList();
+}
+function renderSwapList(){
+  const c=swapCtx;
+  const list=libAll().filter(x=>x.name!==c.exclude&&(c.mg==='ALL'||x.mg===c.mg)&&(!c.home||x.home)
+    &&(!c.q||x.name.toLowerCase().includes(c.q.toLowerCase())));
+  list.sort((a,b)=>a.name.localeCompare(b.name));
+  $('swapList').innerHTML=list.map(x=>{const h=ST.hist[x.name];
+    return `<button class="lib-item" onclick="doSwap('${esc(x.name)}')">
+    <span class="dot" style="background:var(--mg-${x.mg})"></span>
+    <span class="li-main"><span class="li-name">${x.name}${x.home?'':'<span class="badge-gym">GYM</span>'}</span>
+    <span class="li-sub">${cap(x.mg)} · ${x.equip}</span></span>
+    <span class="li-right">${h?`<div class="li-w">${h.w}</div>`:''}<div class="li-date">${x.last||''}</div></span>
+    </button>`;}).join('')||'<p style="color:var(--ink-faint);padding:20px;text-align:center">No matches</p>';
 }
 function closeSwap(){ $('modalRoot').innerHTML=''; swapCtx=null; }
 async function doSwap(name){
-  const c=CAT_BY_NAME[name], slot=ST.draft.days[bdDay-1][swapCtx.slotIdx];
+  if(swapCtx.mode==='entry') return chooseSwapScope(name);
+  const c=libByName(name), slot=ST.draft.days[bdDay-1][swapCtx.slotIdx];
   Object.assign(slot,{name:c.name,mg:c.mg,equip:c.equip,_swapped:true,_auto:false,note:null});
   closeSwap(); await save(); render(); toast(`Swapped in ${name}`);
+}
+
+/* ---------- exercise menu + swap in the active meso ---------- */
+function openExMenu(ei){
+  const e=entryAt(ei);
+  $('modalRoot').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeSwap()"><div class="sheet">
+    <h2>${e.name}</h2>
+    <div class="sheet-stack">
+      <button class="btn-ghost" onclick="openEntrySwap(${ei})">Swap exercise</button>
+      <button class="btn-ghost" onclick="closeSwap()">Cancel</button>
+    </div></div></div>`;
+}
+function openEntrySwap(ei){
+  const e=entryAt(ei);
+  swapCtx={mode:'entry',ei,mg:exInfo(e.name,slotOf(selDay,e)).mg,home:true,q:'',exclude:e.name};
+  renderSwap();
+}
+function chooseSwapScope(name){
+  const ei=swapCtx.ei, e=entryAt(ei), logged=(e.sets||[]).some(s=>s.st==='logged');
+  $('modalRoot').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeSwap()"><div class="sheet">
+    <h2>Swap exercise</h2>
+    <p class="sheet-p">${e.name} → <b>${name}</b></p>
+    <div class="sheet-stack">
+      <button class="btn-primary" ${logged?'disabled':''} onclick="swapEntry(${ei},'${esc(name)}','today')">Just today</button>
+      <button class="btn-ghost" onclick="swapEntry(${ei},'${esc(name)}','meso')">Rest of meso</button>
+      <button class="btn-ghost" onclick="closeSwap()">Cancel</button>
+    </div>
+    <p class="sheet-p" style="font-size:12.5px">${logged
+      ?`You've already logged ${e.name} today, so those sets stay. "Rest of meso" switches from next week.`
+      :`Just today: next week goes back to ${e.name}. Rest of meso: ${name} replaces it from today on.`}</p>
+  </div></div>`;
+}
+/* scope 'today': only this session's entry changes (frozen with u so the plan can't revert it).
+   scope 'meso': the plan slot changes too, so every later session follows. Sets already logged
+   today are never replaced. The new exercise is seeded by prescribeEntry(). */
+async function swapEntry(ei,name,scope){
+  const e=entryAt(ei), slot=slotOf(selDay,e), c=libByName(name);
+  const logged=(e.sets||[]).some(s=>s.st==='logged');
+  if(scope==='today'&&logged) return;
+  if(scope==='meso'&&slot) Object.assign(slot,{name:c.name,mg:c.mg,equip:c.equip,note:null});
+  if(!logged){
+    e.name=c.name; delete e.fb;
+    if(scope==='today'&&!(slot&&slot.name===c.name)) e.u=1; else delete e.u;
+    const p=prescribeEntry(selWeek,selDay,e); e.sets=p.sets; e.why=p.why;
+  }
+  closeSwap(); await ensureDay(selWeek,selDay); await save(); render();
+  toast(scope==='today'?`${c.name}, just for today`:`${c.name} for the rest of the meso`);
 }
 async function discardDraft(){
   if(!confirm('Discard this draft? The current meso is not affected.')) return;

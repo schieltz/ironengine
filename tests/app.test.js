@@ -526,3 +526,93 @@ describe('schema v5: sessions are lists of entries with permanent slot ids', () 
     }
   });
 });
+
+describe('swap an exercise mid-meso (Phase 2)', () => {
+  const ROW = 5;                                   // w2d3 slot 5: Barbell Bent Over Row (R6: 120 x2)
+  const PD = 'Pulldown (Normal Grip)';
+  const logAt = (app, ei, pairs) => app.call(pairs.map(([w, r], j) =>
+    `await upd(${ei},${j},"w","${w}"); await upd(${ei},${j},"reps","${r}"); await tapLog(${ei},${j});`).join(''));
+
+  test('"just today": only this session changes, seeded fresh, and says so', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call(`await swapEntry(${ROW},"${PD}","today");`);
+    const st = app.state(), e = st.meso.log.w2d3[ROW];
+    assert.equal(e.name, PD);
+    assert.deepEqual(e.sets, [rirOnly(null, 2), rirOnly(null, 2)]);   // last week's set count
+    assert.match(e.why, /New in this slot.*No history/);
+    assert.equal(st.meso.days[2][ROW].name, 'Barbell Bent Over Row');
+    assert.match(app.els.get('main').innerHTML, /swapped in today for Barbell Bent Over Row/);
+  });
+
+  test('the week after a one-off swap goes back to the original (missed week, R6)', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call(`await swapEntry(${ROW},"${PD}","today");`);
+    await logAt(app, ROW, [[100, 10], [100, 9]]);
+    await app.call('await pickWeek(3);');
+    const e = app.state().meso.log.w3d3[ROW];
+    assert.equal(e.name, 'Barbell Bent Over Row');
+    assert.deepEqual(e.sets, [rirOnly(120, 2), rirOnly(120, 2)]);
+    assert.match(e.why, /different exercise.*R6/);
+  });
+
+  test('"rest of meso": plan changes and the new exercise progresses normally next week', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call(`await swapEntry(${ROW},"${PD}","meso");`);
+    assert.equal(app.state().meso.days[2][ROW].name, PD);
+    await logAt(app, ROW, [[100, 10], [100, 9]]);
+    await app.call('await pickWeek(3);');
+    const e = app.state().meso.log.w3d3[ROW];
+    assert.equal(e.name, PD);
+    assert.deepEqual(e.sets, [target(100, 11), target(100, 10), rirOnly(100, 2)]);
+  });
+
+  test('a swapped-in exercise seeds from earlier sessions of this meso', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('ST.meso.dates.w2d2="2026-09-23";');                 // recent, so not stale
+    await app.call(`await swapEntry(${ROW},"Chest Supported Row","today");`);   // Wed w2: 65x11,8
+    const e = app.state().meso.log.w2d3[ROW];
+    assert.deepEqual(e.sets.map(s => s.w), [65, 65]);
+    assert.match(e.why, /last top set: <b>65<\/b>/);
+  });
+
+  test('sets already logged today are never replaced', async () => {
+    const app = await bootApp({ now: NOW });
+    const before = app.state().meso.log.w2d3[0];                        // DB lateral raise, logged
+    await app.call('await swapEntry(0,"Cable Lateral Raise (Single-Arm)","today");');
+    assert.deepEqual(app.state().meso.log.w2d3[0], before);
+    await app.call('await swapEntry(0,"Cable Lateral Raise (Single-Arm)","meso");');
+    assert.deepEqual(app.state().meso.log.w2d3[0], before);
+    await app.call('await pickWeek(3);');
+    const e = app.state().meso.log.w3d3[0];
+    assert.equal(e.name, 'Cable Lateral Raise (Single-Arm)');
+    assert.equal(e.sets.length, 3);
+  });
+
+  test('swapping back to the original restores normal prescriptions', async () => {
+    const app = await bootApp({ now: NOW });
+    const original = app.state().meso.log.w2d3[ROW].sets;
+    await app.call(`await swapEntry(${ROW},"${PD}","today"); await swapEntry(${ROW},"Barbell Bent Over Row","today");`);
+    const e = app.state().meso.log.w2d3[ROW];
+    assert.deepEqual(e.sets, original);
+    assert.equal(e.u, undefined);
+  });
+
+  test('picker offers same-muscle exercises, never the current one', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call(`openExMenu(${ROW}); openEntrySwap(${ROW});`);
+    const list = app.els.get('swapList').innerHTML;
+    assert.match(list, /Pulldown \(Normal Grip\)/);
+    assert.doesNotMatch(list, /doSwap\('Barbell Bent Over Row'\)/);
+    assert.doesNotMatch(list, /Machine Chest Press/);
+  });
+
+  test('typing in search updates only the list, so the keyboard stays open', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call(`openEntrySwap(${ROW});`);
+    const sheet = app.els.get('modalRoot').innerHTML;
+    await app.call('swapCtx.q="pulldown"; renderSwapList();');
+    assert.equal(app.els.get('modalRoot').innerHTML, sheet);
+    assert.match(app.els.get('swapList').innerHTML, /Pulldown/);
+    assert.doesNotMatch(app.els.get('swapList').innerHTML, /Pullup/);
+  });
+});
