@@ -544,6 +544,14 @@ describe('swap an exercise mid-meso (Phase 2)', () => {
     assert.match(app.els.get('main').innerHTML, /swapped in today for Barbell Bent Over Row/);
   });
 
+  test('"just today" on a session not started yet survives revisits', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call(`await pickWeek(3); await swapEntry(${ROW},"${PD}","today"); await pickWeek(2); await pickWeek(3);`);
+    const st = app.state();
+    assert.equal(st.meso.log.w3d3[ROW].name, PD);
+    assert.equal(st.meso.days[2][ROW].name, 'Barbell Bent Over Row');
+  });
+
   test('the week after a one-off swap goes back to the original (missed week, R6)', async () => {
     const app = await bootApp({ now: NOW });
     await app.call(`await swapEntry(${ROW},"${PD}","today");`);
