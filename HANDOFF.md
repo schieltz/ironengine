@@ -9,6 +9,8 @@ Live: https://schieltz.github.io/ironengine/
 1. **Storage adapter** (`store`, top of script): mode picked once at startup: `claude` (window.storage) → `local` (localStorage, `ironengine:` prefix, only when window.storage is absent) → `memory`. `get()` distinguishes "nothing saved" from "read failed"; a failed read or unparseable/newer-version data blocks all saves and shows a recovery sheet (Retry / Copy raw / Start fresh, which backs the raw data up to `state2.unreadable-<ts>` first). Failed writes and memory mode show a persistent banner. Swap here for any new backend.
 2. **Pure-function engine**, delimited by `@engine:begin` / `@engine:end` comments: `RULES` (every tunable coefficient), `RIR_RAMP`, `DELOAD_RIR`, `rirFor()`, `prescribe()`, `startingSets()`, `roundLoad()`, `weeksSince()`. No DOM, storage, or app state (enforced by a test). Calibration = change a `RULES` value + add a test; the Engine tab renders from `RULES`, so its text can't drift.
 3. **UI**: five views (Workout / Library / Builder / Engine / Data), string-template rendering, no framework.
+   - Day editing, active meso: the exercise menu has Move up/down (today's session and the plan), Remove from plan (confirmed; gone from today unless sets are logged, and from later weeks; past sessions keep it), and "+ Add exercise" at the bottom of each session: **Just today** (extra entry, frozen with `u`) or **Today + rest of meso** (new plan slot). New slots get ids from `meso.seq` and are seeded like swaps.
+   - Day editing, Builder: tap a slot for Swap, note, priority (maintenance = 1 starting set), Move up/down, Remove; "+ Add exercise" per day.
    - Notes belong to the plan slot (shown every week the slot does that exercise); set from the exercise menu, rendered escaped.
    - "+ New exercise" (Library and picker) creates a custom exercise; from the picker it continues straight into the swap/add.
    - Each workout card has an exercise menu (⋯). Swap opens the shared exercise picker (same muscle group and home filter preselected; search re-renders only the list so the phone keyboard stays open), then asks: **Just today** (only this session's entry changes, frozen with `u`; next week the slot returns to the original, as a missed week, R6) or **Rest of meso** (the plan slot changes; sets already logged today are kept). A swapped-in exercise is seeded from history, including this meso's earlier sessions, with the slot's last set count.
@@ -64,7 +66,6 @@ RIR ramp: 3/2/2/1/0 + deload 8. Days: Mon/Wed/Fri.
 
 ## Known gaps / roadmap candidates
 - R2/R5/R8 coefficients unvalidated — owner is parallel-logging in RP for one meso to calibrate; expect tuning PRs
-- Builder can only swap exercises within existing slots: no add/remove/reorder slots, no priority toggle. To mirror an RP meso, start both apps from the same template
 - No rep-range targets per exercise type (RP likely varies floor by compound/isolation)
 - History stores top set only; consider full set-level history + e1RM trend
 - No multi-meso archive browsing UI (full mesos are kept in `ST.archive` and in backups)

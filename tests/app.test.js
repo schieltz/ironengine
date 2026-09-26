@@ -689,3 +689,100 @@ describe('your own exercises and notes (Phase 3)', () => {
     assert.deepEqual(app.state().custom, []);
   });
 });
+
+describe('change a day\'s exercises (Phase 5)', () => {
+  const names = (st, k) => st.meso.log[k].map(e => e.name);
+  const planNames = (st, d) => st.meso.days[d - 1].map(s => s.name);
+
+  test('move: today, the plan, and later sessions follow; past sessions keep their order', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('await moveEntry(4,-1);');                           // incline above close-grip bench
+    let st = app.state();
+    assert.deepEqual(names(st, 'w2d3').slice(3, 5), ['Dumbbell Press (High Incline)', 'Bench Press (Close Grip)']);
+    assert.deepEqual(planNames(st, 3).slice(3, 5), ['Dumbbell Press (High Incline)', 'Bench Press (Close Grip)']);
+    assert.deepEqual(names(st, 'w1d3').slice(3, 5), ['Bench Press (Close Grip)', 'Dumbbell Press (High Incline)']);
+    await logReps(app, 'w2d3', 4, [11, 10, 9]);                        // bench, now 5th
+    await app.call('await pickWeek(3);');
+    st = app.state();
+    assert.deepEqual(names(st, 'w3d3').slice(3, 5), ['Dumbbell Press (High Incline)', 'Bench Press (Close Grip)']);
+    assert.deepEqual(st.meso.log.w3d3[4].sets, [target(120, 12), target(120, 11), target(120, 10), rirOnly(120, 2)]);
+  });
+
+  test('remove from plan: gone from today and later weeks, kept in history', async () => {
+    const app = await bootApp({ now: NOW, confirm: () => true });
+    await app.call('await removeEntry(7);');                            // Zercher, untouched today
+    await app.call('await pickWeek(3);');
+    const st = app.state();
+    for (const k of ['w2d3', 'w3d3']) assert.ok(!names(st, k).includes('Zercher Squat'), k);
+    assert.ok(!planNames(st, 3).includes('Zercher Squat'));
+    assert.ok(names(st, 'w1d3').includes('Zercher Squat'));
+  });
+
+  test('remove keeps sets already logged today', async () => {
+    const app = await bootApp({ now: NOW, confirm: () => true });
+    await app.call('await removeEntry(0);');                            // DB lateral raise, logged
+    await app.call('await pickWeek(3);');
+    const st = app.state();
+    assert.equal(names(st, 'w2d3')[0], 'Dumbbell Lateral Raise');
+    assert.ok(!names(st, 'w3d3').includes('Dumbbell Lateral Raise'));
+  });
+
+  test('declining the remove confirmation changes nothing', async () => {
+    const app = await bootApp({ now: NOW, confirm: () => false });
+    const before = app.state();
+    await app.call('await removeEntry(7);');
+    assert.deepEqual(app.state(), before);
+  });
+
+  test('add "just today": this session only, seeded, gone next week', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('await addEntry("Hammer Curl","today");');
+    let st = app.state();
+    const e = st.meso.log.w2d3.at(-1);
+    assert.equal(e.name, 'Hammer Curl');
+    assert.equal(e.u, 1);
+    assert.ok(e.sets.length === 2 && e.sets.every(s => s.w === 20), JSON.stringify(e.sets)); // Wed w2: 20x8,7,7
+    assert.ok(!planNames(st, 3).includes('Hammer Curl'));
+    await app.call('await pickWeek(3);');
+    assert.ok(!names(app.state(), 'w3d3').includes('Hammer Curl'));
+  });
+
+  test('add to the plan: in later weeks and progressing from today', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('await addEntry("Hammer Curl","meso");');
+    const i = app.state().meso.log.w2d3.length - 1;
+    await app.call(`for (const j of [0,1]) { await upd(${i},j,"w","25"); await upd(${i},j,"reps","12"); await tapLog(${i},j); }`);
+    await app.call('await pickWeek(3);');
+    const st = app.state(), e = st.meso.log.w3d3.find(x => x.name === 'Hammer Curl');
+    assert.deepEqual(e.sets, [target(25, 13), target(25, 13), rirOnly(25, 2)]);
+    assert.equal(planNames(st, 3).at(-1), 'Hammer Curl');
+  });
+
+  test('"+ Add exercise" opens the picker across all muscles', async () => {
+    const app = await bootApp({ now: NOW });
+    assert.match(app.els.get('main').innerHTML, /openAdd\(\)/);
+    await app.call('openAdd();');
+    assert.match(app.els.get('modalRoot').innerHTML, /<h2>Add exercise<\/h2>/);
+    assert.match(app.els.get('swapList').innerHTML, /Stair Calves/);
+    assert.match(app.els.get('swapList').innerHTML, /Pulldown/);
+  });
+
+  test('Builder: add, move, remove, priority and notes carry into the new meso', async () => {
+    const app = await bootApp({ now: NOW, confirm: () => true, prompt: () => 'Slow eccentric' });
+    await app.call(`await makeDraft(); bdDay=1;
+      await draftRemove(5);                  // drop Romanian Deadlift
+      await draftMove(0,1);                  // pushdown first
+      await togglePri(0);                    // pushdown -> maintenance
+      await editDraftNote(1);
+      await draftAdd("Hammer Curl");
+      await activateDraft();`);
+    const st = app.state(), mon = st.meso.days[0];
+    assert.deepEqual(mon.map(s => s.name), ['Cable Triceps Pushdown (Bar)', 'Dip (Weighted, Triceps-Focused)',
+      'Cable Upright Row', 'Cable Curl', 'Bench Press (Medium Grip)', 'Hammer Curl']);
+    assert.equal(mon[0].pri, 0);
+    assert.equal(mon[1].note, 'Slow eccentric');
+    assert.equal(new Set(st.meso.days.flat().map(s => s.id)).size, st.meso.days.flat().length);
+    assert.equal(st.meso.log.w1d1[0].sets.length, 1);                  // maintenance starts at 1 set
+    assert.equal(st.meso.log.w1d1[1].sets.length, 2);
+  });
+});

@@ -769,6 +769,7 @@ function renderWorkout(){
       </div>
     </div>`;
   });
+  html+=`<button class="bigbtn ghost" onclick="openAdd()">+ Add exercise</button>`;
   const flat=log.flatMap(e=>e.sets||[]);
   if(flat.length>0&&flat.every(s=>s.st))
     html+=`<div class="session-done"><div class="big">Session complete</div>
@@ -917,12 +918,13 @@ function renderBuilder(){
       lastMg=ex.mg;
       const h=ST.hist[ex.name];
       const priTag=ex.pri===0?' · <span style="color:var(--amber)">maintenance</span>':'';
-      return tag+`<button class="slot ${ex._swapped?'changed':''}" onclick="openSwap(${i})">
+      return tag+`<button class="slot ${ex._swapped?'changed':''}" onclick="openSlotMenu(${i})">
         <span class="dot" style="background:var(--mg-${ex.mg});width:9px;height:9px;border-radius:50%;flex:0 0 auto"></span>
         <span class="li-main"><span class="li-name">${ex.name}</span>
-        <span class="li-sub">${ex.equip}${h?` · last ${h.w}`:''}${priTag}</span></span>
-        <span class="swap">Swap ›</span></button>`;
+        <span class="li-sub">${ex.equip}${h?` · last ${h.w}`:''}${priTag}${ex.note?` · 📌 ${escHtml(ex.note)}`:''}</span></span>
+        <span class="swap">Edit ›</span></button>`;
     }).join('')}
+    <button class="bigbtn ghost" onclick="openDraftAdd()">+ Add exercise</button>
     <button class="bigbtn" onclick="activateDraft()">Activate meso — archive current</button>
     <button class="bigbtn ghost" onclick="discardDraft()">Discard draft</button>`;
 }
@@ -960,8 +962,8 @@ function renderSwap(){
   const c=swapCtx;
   $('modalRoot').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeSwap()">
     <div class="sheet">
-      <h2>Swap exercise</h2>
-      <p class="sheet-p">Replacing <b>${c.exclude}</b></p>
+      ${c.exclude?`<h2>Swap exercise</h2><p class="sheet-p">Replacing <b>${c.exclude}</b></p>`
+        :`<h2>Add exercise</h2><p class="sheet-p">To ${DAYS[(c.mode==='draftAdd'?bdDay:selDay)-1]}</p>`}
       <div class="lib-search" style="margin:10px 0 6px"><input placeholder="Search" value="${escHtml(c.q)}"
         oninput="swapCtx.q=this.value;renderSwapList()"></div>
       <div class="chiprow">
@@ -990,6 +992,8 @@ function renderSwapList(){
 function closeSwap(){ $('modalRoot').innerHTML=''; swapCtx=null; }
 async function doSwap(name){
   if(swapCtx.mode==='entry') return chooseSwapScope(name);
+  if(swapCtx.mode==='add') return chooseAddScope(name);
+  if(swapCtx.mode==='draftAdd') return draftAdd(name);
   const c=libByName(name), slot=ST.draft.days[bdDay-1][swapCtx.slotIdx];
   Object.assign(slot,{name:c.name,mg:c.mg,equip:c.equip,_swapped:true,_auto:false,note:null});
   closeSwap(); await save(); render(); toast(`Swapped in ${name}`);
@@ -1003,6 +1007,9 @@ function openExMenu(ei){
     <div class="sheet-stack">
       <button class="btn-ghost" onclick="openEntrySwap(${ei})">Swap exercise</button>
       ${own?`<button class="btn-ghost" onclick="editNote(${ei})">${slot.note?'Edit note':'Add note'}</button>`:''}
+      ${ei>0?`<button class="btn-ghost" onclick="moveEntry(${ei},-1)">Move up</button>`:''}
+      ${ei<ST.meso.log[key(selWeek,selDay)].length-1?`<button class="btn-ghost" onclick="moveEntry(${ei},1)">Move down</button>`:''}
+      <button class="btn-ghost" style="color:var(--red)" onclick="removeEntry(${ei})">${slot?'Remove from plan':'Remove from today'}</button>
       <button class="btn-ghost" onclick="closeSwap()">Cancel</button>
     </div></div></div>`;
 }
@@ -1026,6 +1033,50 @@ function chooseSwapScope(name){
       :`Just today: next week goes back to ${e.name}. Rest of meso: ${name} replaces it from today on.`}</p>
   </div></div>`;
 }
+/* ---------- editing a day in the active meso ----------
+   Plan edits (M.days) shape every session not started yet; today's session changes with them, except
+   that sets already logged are never removed. Sessions already started keep their own list. */
+async function moveEntry(ei,dir){
+  const M=ST.meso, log=M.log[key(selWeek,selDay)], j=ei+dir;
+  if(j<0||j>=log.length) return;
+  const plan=M.days[selDay-1], a=plan.findIndex(s=>s.id===log[ei].slot), b=plan.findIndex(s=>s.id===log[j].slot);
+  [log[ei],log[j]]=[log[j],log[ei]];
+  if(a>=0&&b>=0) [plan[a],plan[b]]=[plan[b],plan[a]];
+  closeSwap(); await ensureDay(selWeek,selDay); await save(); render();
+}
+async function removeEntry(ei){
+  const M=ST.meso, log=M.log[key(selWeek,selDay)], e=log[ei], plan=M.days[selDay-1];
+  const inPlan=plan.some(s=>s.id===e.slot), logged=(e.sets||[]).some(s=>s.st==='logged');
+  if(!inPlan&&logged){ toast('Already logged today, so it stays'); return; }
+  if(!confirm(inPlan?`Remove ${e.name} from ${DAYS[selDay-1]} for the rest of the meso?${logged?' The sets you logged today stay.':''}`
+    :`Remove ${e.name} from today?`)) return;
+  if(inPlan) M.days[selDay-1]=plan.filter(s=>s.id!==e.slot);
+  if(!logged) log.splice(ei,1);
+  closeSwap(); await ensureDay(selWeek,selDay); await save(); render();
+}
+function openAdd(){ swapCtx={mode:'add',mg:'ALL',home:true,q:'',exclude:null}; renderSwap(); }
+function chooseAddScope(name){
+  $('modalRoot').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeSwap()"><div class="sheet">
+    <h2>Add exercise</h2>
+    <p class="sheet-p"><b>${name}</b> → ${DAYS[selDay-1]}</p>
+    <div class="sheet-stack">
+      <button class="btn-primary" onclick="addEntry('${esc(name)}','today')">Just today</button>
+      <button class="btn-ghost" onclick="addEntry('${esc(name)}','meso')">Today + rest of meso</button>
+      <button class="btn-ghost" onclick="closeSwap()">Cancel</button>
+    </div></div></div>`;
+}
+/* 'today': an extra entry in this session only (frozen with u). 'meso': a new plan slot, so every later
+   session gets it too. Either way it gets its own slot id and is seeded by prescribeEntry(). */
+async function addEntry(name,scope){
+  const M=ST.meso, c=libByName(name), id='s'+(++M.seq), e={slot:id,name:c.name,sets:null};
+  if(scope==='meso') M.days[selDay-1].push({id,name:c.name,mg:c.mg,equip:c.equip,note:null,pri:1});
+  else e.u=1;
+  M.log[key(selWeek,selDay)].push(e);
+  const p=prescribeEntry(selWeek,selDay,e); e.sets=p.sets; e.why=p.why;
+  closeSwap(); await ensureDay(selWeek,selDay); await save(); render();
+  toast(scope==='today'?`${c.name} added for today`:`${c.name} added to ${DAYS[selDay-1]}`);
+}
+
 /* A note belongs to the plan slot, so it shows every week this exercise is done in that slot. */
 async function editNote(ei){
   const slot=slotOf(selDay,entryAt(ei));
@@ -1120,6 +1171,40 @@ async function swapEntry(ei,name,scope){
   }
   closeSwap(); await ensureDay(selWeek,selDay); await save(); render();
   toast(scope==='today'?`${c.name}, just for today`:`${c.name} for the rest of the meso`);
+}
+/* ---------- editing a draft day (Builder) ---------- */
+function openSlotMenu(i){
+  const a=ST.draft.days[bdDay-1], s=a[i];
+  $('modalRoot').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeSwap()"><div class="sheet">
+    <h2>${s.name}</h2>
+    <p class="sheet-p">${s.pri===0?'Maintenance: starts at 1 set':'Full priority: starts at 2 sets'}</p>
+    <div class="sheet-stack">
+      <button class="btn-ghost" onclick="openSwap(${i})">Swap exercise</button>
+      <button class="btn-ghost" onclick="editDraftNote(${i})">${s.note?'Edit note':'Add note'}</button>
+      <button class="btn-ghost" onclick="togglePri(${i})">${s.pri===0?'Make full priority (2 sets)':'Make maintenance (1 set)'}</button>
+      ${i>0?`<button class="btn-ghost" onclick="draftMove(${i},-1)">Move up</button>`:''}
+      ${i<a.length-1?`<button class="btn-ghost" onclick="draftMove(${i},1)">Move down</button>`:''}
+      <button class="btn-ghost" style="color:var(--red)" onclick="draftRemove(${i})">Remove</button>
+      <button class="btn-ghost" onclick="closeSwap()">Cancel</button>
+    </div></div></div>`;
+}
+async function draftMove(i,dir){
+  const a=ST.draft.days[bdDay-1], j=i+dir;
+  if(j<0||j>=a.length) return;
+  [a[i],a[j]]=[a[j],a[i]]; closeSwap(); await save(); render();
+}
+async function draftRemove(i){ ST.draft.days[bdDay-1].splice(i,1); closeSwap(); await save(); render(); }
+async function togglePri(i){ const s=ST.draft.days[bdDay-1][i]; s.pri=s.pri===0?1:0; closeSwap(); await save(); render(); }
+async function editDraftNote(i){
+  const s=ST.draft.days[bdDay-1][i], v=prompt(`Note for ${s.name} (leave empty to remove)`,s.note||'');
+  if(v===null) return;
+  s.note=v.trim().slice(0,120)||null; closeSwap(); await save(); render();
+}
+function openDraftAdd(){ swapCtx={mode:'draftAdd',mg:'ALL',home:true,q:'',exclude:null}; renderSwap(); }
+async function draftAdd(name){
+  const c=libByName(name);
+  ST.draft.days[bdDay-1].push({name:c.name,mg:c.mg,equip:c.equip,note:null,pri:1,_swapped:true});
+  closeSwap(); await save(); render(); toast(`${c.name} added to ${DAYS[bdDay-1]}`);
 }
 async function discardDraft(){
   if(!confirm('Discard this draft? The current meso is not affected.')) return;
