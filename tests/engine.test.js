@@ -195,6 +195,12 @@ describe('cross-meso seeding (startingSets, week 1 @ 3 RIR)', () => {
     assert.equal(E.startingSets('B', hist, 3, 2).sets[0].w, 160); // 157.5 -> 160
   });
 
+  test('history with unknown date -> used as-is, never treated as stale', () => {
+    const p = E.startingSets('Old', { Old: { w: 135, date: null } }, 3, 2);
+    assert.deepEqual(p.sets.map(s => s.w), [135, 135]);
+    assert.match(p.why, /date unknown/);
+  });
+
   test('no history -> null weight, user enters it', () => {
     const p = E.startingSets('Never Done', {}, 3, 2);
     assert.deepEqual(p.sets, [rirOnly(null, 3), rirOnly(null, 3)]);

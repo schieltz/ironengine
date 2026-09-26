@@ -16,7 +16,8 @@ Live: https://schieltz.github.io/ironengine/
 - Feedback belongs to the session it was given in (`fb[wNdM][i]`) and shapes only the next week's prescription for that exercise on that day (v2; v1 stored one answer per exercise that applied to every later week).
 - set: {w, reps, tgt, rir, st: 'logged'|'skipped'|null, u?: 1}. `u` = user-touched (edited, tapped, or manually added).
 - Prescriptions are provisional: `planDay()` recomputes every exercise in a session from the prior week on each visit until any of its sets is touched (`st` or `u`); touched exercises are never recomputed. It fills missing prior weeks recursively, so looking ahead never freezes stale numbers or produces 0 lb sets. When the prior week is unlogged, the "why" says it's a preview.
-- `ST.hist`: exercise name → {w: last top-set weight, date} — cross-meso, permanent
+- `ST.hist`: exercise name → {w: last top-set weight, date} — cross-meso, permanent. Harvested on Activate by `harvestHistory()`: heaviest logged set in the exercise's most recent session (schedule order), dated with that session's date. It can go down. `date: null` = unknown (never treated as stale).
+- `ST.meso.dates`: session → local date its first set was logged (v4). Undated legacy sessions borrow the meso's latest known date at harvest.
 - `ST.draft`: meso under construction in Builder
 - `ST.archive`: finished mesos, kept whole (every set) with `archivedAt` when a draft is activated (v3). No browsing UI yet; included in backups.
 - `CATALOG`: 98 exercises (owner's performed list from RP), each {name, mg, equip, last, home}

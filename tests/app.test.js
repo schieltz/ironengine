@@ -415,3 +415,45 @@ describe('log button never destroys entered reps (S3)', () => {
     assert.doesNotMatch(app.els.get('main').innerHTML, /skipRest\(3\)/);
   });
 });
+
+describe('cross-meso history = last top set, real dates (S1)', () => {
+  const activate = app => app.call('await makeDraft(); await activateDraft();');
+
+  test('logging stamps the session with the local date, once', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('await pickWeek(3); await upd(0,0,"reps","9"); await tapLog(0,0);');
+    assert.equal(app.state().meso.dates.w3d3, '2026-09-25');
+    await app.call('ST.meso.dates.w3d3="2026-09-20"; await tapLog(0,1);');
+    assert.equal(app.state().meso.dates.w3d3, '2026-09-20');
+  });
+
+  test('a lighter recent top set replaces a heavier old one, dated when trained', async () => {
+    const app = await bootApp({ now: NOW, confirm: () => true });
+    assert.deepEqual(app.state().hist.Deadlift, { w: 300, date: '2026-07-04' });
+    await app.call(`await pickWeek(3);
+      for (const j of [0,1]) { await upd(6,j,"w","275"); await upd(6,j,"reps","5"); await tapLog(6,j); }`);
+    await activate(app);
+    assert.deepEqual(app.state().hist.Deadlift, { w: 275, date: '2026-09-25' });
+    assert.match(app.run('startingSets("Deadlift",ST.hist,3,2).why'), /Seeded.*275/);   // not "11 wks ago"
+  });
+
+  test('the later session wins even when an earlier one was heavier', async () => {
+    const app = await bootApp({ now: NOW, confirm: () => true });
+    // close-grip bench: Wed w2 logged 120x12,11; Fri w2 logged here at 115
+    await app.call(`for (const j of [0,1]) { await upd(3,j,"w","115"); await tapLog(3,j); }`);
+    await activate(app);
+    assert.deepEqual(app.state().hist['Bench Press (Close Grip)'], { w: 115, date: '2026-07-19' });
+  });
+
+  test('undated sessions borrow the meso\'s latest known date, else null', async () => {
+    const app = await bootApp({ now: NOW, confirm: () => true });
+    await app.call('ST.meso.dates={w1d3:"2026-07-09"};');
+    await activate(app);
+    assert.equal(app.state().hist['EZ Bar Curl (Normal Grip)'].date, '2026-07-09');   // from undated w2d3
+
+    const bare = await bootApp({ now: NOW, confirm: () => true });
+    await bare.call('ST.meso.dates={};');
+    await activate(bare);
+    assert.equal(bare.state().hist['EZ Bar Curl (Normal Grip)'].date, null);
+  });
+});
