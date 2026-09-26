@@ -412,11 +412,13 @@ describe('log button never destroys entered reps (S3)', () => {
     assert.equal(s().st, null);
   });
 
-  test('"Skip rest" skips only the sets not yet logged', async () => {
+  test('"Skip remaining sets" (exercise menu) skips only the sets not yet logged', async () => {
     const app = await bootApp({ now: NOW });
-    await app.call('await tapLog(3,0); await skipRest(3);');
+    await app.call('await tapLog(3,0); openExMenu(3);');
+    assert.match(app.els.get('modalRoot').innerHTML, /Skip remaining sets/);
+    await app.call('await skipRest(3); openExMenu(3);');
     assert.deepEqual(app.state().meso.log.w2d3[3].sets.map(s => s.st), ['logged', 'skipped', 'skipped']);
-    assert.doesNotMatch(app.els.get('main').innerHTML, /skipRest\(3\)/);
+    assert.doesNotMatch(app.els.get('modalRoot').innerHTML, /Skip remaining sets/);
   });
 });
 
@@ -831,5 +833,39 @@ describe('rep targets follow weight changes (#4)', () => {
     const app = await bootApp({ now: NOW });
     await app.call('for (const j of [0,1]) { await upd(3,j,"w","130"); await tapLog(3,j); } await skipRest(3); await pickWeek(3);');
     assert.deepEqual(app.state().meso.log.w3d3[3].sets.slice(0, 2), [target(130, 9), target(130, 8)]);
+  });
+});
+
+describe('remove sets (#2)', () => {
+  const bench = app => app.state().meso.log.w2d3[3];
+
+  test('"−" removes the last set, and it stays removed on revisits', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('await removeSet(3); await pickWeek(3); await pickWeek(2);');
+    assert.deepEqual(bench(app).sets, [target(120, 11), target(120, 10)]);
+    assert.equal(bench(app).u, 1);
+  });
+
+  test('a logged last set is removed only after confirming', async () => {
+    let answer = false;
+    const app = await bootApp({ now: NOW, confirm: () => answer });
+    await app.call('await removeSet(3); await tapLog(3,1); await removeSet(3);');
+    assert.equal(bench(app).sets.length, 2);
+    answer = true;
+    await app.call('await removeSet(3);');
+    assert.equal(bench(app).sets.length, 1);
+  });
+
+  test('one set minimum: the button is disabled and nothing is removed', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('await removeSet(3); await removeSet(3); await removeSet(3);');
+    assert.equal(bench(app).sets.length, 1);
+    assert.match(app.els.get('main').innerHTML, /onclick="removeSet\(3\)" aria-label="Remove last set" disabled/);
+  });
+
+  test('next week progresses from the sets you kept', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('await removeSet(3); await tapLog(3,0); await tapLog(3,1); await pickWeek(3);');
+    assert.deepEqual(app.state().meso.log.w3d3[3].sets, [target(120, 12), target(120, 11), rirOnly(120, 2)]);
   });
 });

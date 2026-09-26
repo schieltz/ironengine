@@ -66,6 +66,7 @@ main{padding:6px 12px}
 .why b{color:var(--blue);font-weight:700}
 .card-actions{display:flex;gap:8px;margin-top:10px}
 .card-actions button.more{flex:0 0 48px;font-size:17px;letter-spacing:1px}
+.card-actions button:disabled{opacity:.35}
 .card-actions button{flex:1;padding:9px;border-radius:9px;background:var(--panel2);border:1px solid var(--line);
   font-size:12.5px;font-weight:700;color:var(--ink-dim);text-align:center}
 .fb-done{border-color:var(--green)!important;color:var(--green)!important}
@@ -908,8 +909,8 @@ function renderWorkout(){
       ${sets.map((s,j)=>setRow(i,j,s)).join('')}
       ${why}
       <div class="card-actions">
+        <button class="more" onclick="removeSet(${i})" aria-label="Remove last set" ${sets.length<=1?'disabled':''}>−</button>
         <button onclick="addSet(${i})">+ Set</button>
-        ${sets.some(s=>!s.st)?`<button onclick="skipRest(${i})">Skip rest</button>`:''}
         <button class="${e.fb?'fb-done':''}" onclick="openFeedback(${i})">${e.fb?'✓ Feedback':'Feedback'}</button>
         <button class="more" onclick="openExMenu(${i})" aria-label="Exercise options">⋯</button>
       </div>
@@ -973,6 +974,15 @@ async function tapLog(ei,si){
 }
 async function skipRest(ei){
   entryAt(ei).sets.forEach(s=>{ if(!s.st){ s.st='skipped'; s.reps=null; s.u=1; } });
+  await save(); render();
+}
+/* Removes the last set (logged ones only after a confirm). One set minimum: to drop the exercise,
+   use Remove in the exercise menu. The entry is marked touched so the plan can't put the set back. */
+async function removeSet(ei){
+  const e=entryAt(ei), n=e.sets.length, s=e.sets[n-1];
+  if(n<=1){ toast('One set minimum. To drop the exercise, use ⋯ → Remove'); return; }
+  if(s.st==='logged'&&!confirm(`Remove set ${n} (${s.w??'bodyweight'} × ${s.reps}, already logged)?`)) return;
+  e.sets.pop(); e.u=1;
   await save(); render();
 }
 async function addSet(ei){
@@ -1167,6 +1177,7 @@ function openExMenu(ei){
     <h2>${e.name}</h2>
     <div class="sheet-stack">
       <button class="btn-ghost" onclick="openEntrySwap(${ei})">Swap exercise</button>
+      ${(e.sets||[]).some(s=>!s.st)?`<button class="btn-ghost" onclick="closeSwap();skipRest(${ei})">Skip remaining sets</button>`:''}
       ${own?`<button class="btn-ghost" onclick="editNote(${ei})">${slot.note?'Edit note':'Add note'}</button>`:''}
       ${ei>0?`<button class="btn-ghost" onclick="moveEntry(${ei},-1)">Move up</button>`:''}
       ${ei<ST.meso.log[key(selWeek,selDay)].length-1?`<button class="btn-ghost" onclick="moveEntry(${ei},1)">Move down</button>`:''}
