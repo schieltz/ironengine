@@ -377,3 +377,41 @@ describe('destructive actions and backups (C3)', () => {
     assert.equal(app.run('loadError'), null);
   });
 });
+
+describe('log button never destroys entered reps (S3)', () => {
+  const set0 = app => app.state().meso.log.w2d3[3][0];   // close-grip bench, set 1 (target 11)
+
+  test('tapping a logged set un-logs it and keeps the reps; tapping again re-logs', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('await upd(3,0,"reps","12"); await tapLog(3,0);');
+    assert.equal(set0(app).st, 'logged');
+    await app.call('await tapLog(3,0);');
+    assert.deepEqual([set0(app).st, set0(app).reps], [null, 12]);
+    await app.call('await tapLog(3,0);');
+    assert.deepEqual([set0(app).st, set0(app).reps], ['logged', 12]);
+  });
+
+  test('one tap on an untouched set logs its target reps', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('await tapLog(3,0);');
+    assert.deepEqual([set0(app).st, set0(app).reps], ['logged', 11]);
+  });
+
+  test('a set with no reps and no target needs a second tap to skip', async () => {
+    const app = await bootApp({ now: NOW });
+    const s = () => app.state().meso.log.w2d3[3][2];     // the new set: RIR target only
+    await app.call('await tapLog(3,2);');
+    assert.equal(s().st, null);
+    await app.call('await tapLog(3,2);');
+    assert.equal(s().st, 'skipped');
+    await app.call('await tapLog(3,2);');
+    assert.equal(s().st, null);
+  });
+
+  test('"Skip rest" skips only the sets not yet logged', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('await tapLog(3,0); await skipRest(3);');
+    assert.deepEqual(app.state().meso.log.w2d3[3].map(s => s.st), ['logged', 'skipped', 'skipped']);
+    assert.doesNotMatch(app.els.get('main').innerHTML, /skipRest\(3\)/);
+  });
+});

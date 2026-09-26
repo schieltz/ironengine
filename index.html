@@ -655,6 +655,7 @@ function renderWorkout(){
       ${why}
       <div class="card-actions">
         <button onclick="addSet(${i})">+ Set</button>
+        ${sets.some(s=>!s.st)?`<button onclick="skipRest(${i})">Skip rest</button>`:''}
         <button class="${fbFor(k,i)?'fb-done':''}" onclick="openFeedback(${i})">${fbFor(k,i)?'✓ Feedback':'Feedback'}</button>
       </div>
     </div>`;
@@ -675,7 +676,7 @@ function setRow(ei,si,s){
     <input type="number" inputmode="decimal" value="${s.w??''}" onchange="upd(${ei},${si},'w',this.value)">
     <input type="number" inputmode="numeric" class="${repPh?'rir-ph':''}" value="${repVal}" placeholder="${repPh}"
       onchange="upd(${ei},${si},'reps',this.value)">
-    <button class="log-btn ${btnCls}" onclick="cycleLog(${ei},${si})">${btnTxt}</button>
+    <button class="log-btn ${btnCls}" onclick="tapLog(${ei},${si})">${btnTxt}</button>
   </div>`;
 }
 async function upd(ei,si,f,v){
@@ -683,16 +684,24 @@ async function upd(ei,si,f,v){
   s[f]=v===''?null:parseFloat(v); s.u=1;   /* u: user-touched, freezes this exercise's prescription */
   await save();
 }
-async function cycleLog(ei,si){
-  const s=ST.meso.log[key(selWeek,selDay)][ei][si];
-  s.u=1;
-  if(!s.st){
-    if(s.reps==null && s.tgt==null && s._skipArm){ delete s._skipArm; s.st='skipped'; await save(); render(); return; }
+/* Log button: open set → logged (empty reps take the target); logged or skipped → open again,
+   reps kept. An open set with no reps and no target needs a second tap to skip. */
+let skipArm=null;
+async function tapLog(ei,si){
+  const k=key(selWeek,selDay), s=ST.meso.log[k][ei][si], id=`${k}:${ei}:${si}`;
+  if(s.st) s.st=null;
+  else{
     if(s.reps==null && s.tgt!=null) s.reps=s.tgt;
-    if(s.reps==null){ toast('Enter reps first — tap again to skip'); s._skipArm=true; return; }
-    s.st='logged';
-  } else if(s.st==='logged'){ s.st='skipped'; s.reps=null; }
-  else s.st=null;
+    if(s.reps==null){
+      if(skipArm!==id){ skipArm=id; toast('Enter reps first, or tap again to skip'); return; }
+      s.st='skipped';
+    } else s.st='logged';
+  }
+  s.u=1; skipArm=null;
+  await save(); render();
+}
+async function skipRest(ei){
+  ST.meso.log[key(selWeek,selDay)][ei].forEach(s=>{ if(!s.st){ s.st='skipped'; s.reps=null; s.u=1; } });
   await save(); render();
 }
 async function addSet(ei){
