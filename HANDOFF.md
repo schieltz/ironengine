@@ -32,7 +32,7 @@ Live: https://schieltz.github.io/ironengine/
 | R4 | Joint pain ≥ moderate → hold reps, no set add | Inferred |
 | R5 | Workload 'too much' → hold sets; 'not enough' → +2 | Inferred |
 | R6 | All sets skipped → re-prescribe same weights, RIR only | VERIFIED |
-| R7 | Deload wk 6: half sets, 8 RIR | Per RP docs. Doubtful on load: logged deload day 3 was half weight (60 → 30×5,5); lead only |
+| R7 | Deload wk 6: half sets, 8 RIR (also when week 5 was fully skipped) | Per RP docs. Doubtful on load: logged deload day 3 was half weight (60 → 30×5,5); lead only |
 | R8 | Soreness: still sore → hold volume; never sore + low pump → +2 sets | Inferred |
 | Seeding | Wk 1 from hist; >8 wks stale → −10%; maintenance-priority slots start 1 set, full 2 | Design decision |
 
