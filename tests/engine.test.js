@@ -268,3 +268,16 @@ describe('transparency: every prescription carries a "why"', () => {
     }
   });
 });
+
+describe('equal-effort rep targets when the load changes (Epley, RIR held)', () => {
+  test('same load returns the same target', () => {
+    assert.equal(E.equivalentReps(120, 11, 2, 120), 11);
+  });
+  test('heavier -> fewer reps, lighter -> more reps', () => {
+    assert.equal(E.equivalentReps(120, 11, 2, 130), 8);
+    assert.equal(E.equivalentReps(120, 11, 2, 110), 15);
+  });
+  test('never below 1 rep', () => {
+    assert.equal(E.equivalentReps(100, 3, 0, 200), 1);
+  });
+});

@@ -42,6 +42,7 @@ Live: https://schieltz.github.io/ironengine/
 | R6 | All sets skipped → re-prescribe same weights, RIR only | VERIFIED |
 | R7 | Deload wk 6: half sets, 8 RIR (also when week 5 was fully skipped) | Per RP docs. Doubtful on load: logged deload day 3 was half weight (60 → 30×5,5); lead only |
 | R8 | Soreness: still sore → hold volume; never sore + low pump → +2 sets | Inferred |
+| Weight change | Set's weight edited before logging (no reps typed) → rep target re-derived for equal effort at the week's RIR: Epley on reps-to-failure, `RULES.epley`=30, measured from the originally prescribed weight/target (`pw`/`ptgt` on the set); hint line under the set | Inferred (owner request 2026-09-26); calibrate vs RP |
 | Seeding | Wk 1 from hist; >8 wks stale → −10%; maintenance-priority slots start 1 set, full 2 | Design decision |
 
 RIR ramp: 3/2/2/1/0 + deload 8. Days: Mon/Wed/Fri.

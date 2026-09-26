@@ -60,6 +60,8 @@ main{padding:6px 12px}
 .log-btn.next{border-color:var(--blue)}
 .log-btn.logged{background:var(--green);border-color:var(--green);color:#0E1012}
 .log-btn.skipped{background:var(--panel2);border-color:var(--ink-faint);color:var(--ink-dim)}
+.set-hint{margin:-2px 0 4px 52px;font-size:11.5px;color:var(--amber);line-height:1.35}
+.set-hint:empty{display:none}
 .why{margin-top:4px;font-size:11.5px;color:var(--ink-faint);padding:0 2px;line-height:1.45}
 .why b{color:var(--blue);font-weight:700}
 .card-actions{display:flex;gap:8px;margin-top:10px}
@@ -625,9 +627,16 @@ const RULES={
   strongSetAdd:2,      // R5/R8: sets added on an under-stimulated signal
   staleWeeks:8,        // seeding: history older than this many weeks is discounted
   staleDiscount:0.10,  // seeding: discount on stale history
+  epley:30,            // rep/load trade-off: 1RM ≈ weight × (1 + reps/epley)  (inferred; calibrate vs RP)
 };
 const pct=x=>Math.round(x*100);
 function rirFor(week){ return week>RIR_RAMP.length ? DELOAD_RIR : RIR_RAMP[week-1]; }
+/* Rep target for the same effort at a different load: holds reps in reserve constant and keeps the
+   estimated 1RM (Epley, on reps to failure = target + RIR) the same. */
+function equivalentReps(w,reps,rir,newW){
+  const r=rir||0, e1rm=w*(1+(reps+r)/RULES.epley);
+  return Math.max(1,Math.round(RULES.epley*(e1rm/newW-1)-r));
+}
 function roundLoad(w){ return Math.max(RULES.minLoad,Math.round(w/RULES.loadStep)*RULES.loadStep); }
 function weeksSince(dateStr){
   return Math.floor((Date.now()-new Date(dateStr).getTime())/(7*86400*1000));
@@ -920,16 +929,31 @@ function setRow(ei,si,s){
   const btnTxt=s.st==='logged'?'✓':s.st==='skipped'?'−':'';
   return `<div class="set-row">
     <span class="set-num">${si+1}</span>
-    <input type="number" inputmode="decimal" value="${s.w??''}" onchange="upd(${ei},${si},'w',this.value)">
-    <input type="number" inputmode="numeric" class="${repPh?'rir-ph':''}" value="${repVal}" placeholder="${repPh}"
+    <input type="number" inputmode="decimal" id="w-${ei}-${si}" value="${s.w??''}" onchange="upd(${ei},${si},'w',this.value)">
+    <input type="number" inputmode="numeric" id="r-${ei}-${si}" class="${repPh?'rir-ph':''}" value="${repVal}" placeholder="${repPh}"
       onchange="upd(${ei},${si},'reps',this.value)">
     <button class="log-btn ${btnCls}" onclick="tapLog(${ei},${si})">${btnTxt}</button>
-  </div>`;
+  </div><div class="set-hint" id="h-${ei}-${si}">${setHint(s)}</div>`;
 }
+/* Changing the weight of a set that has a rep target (and no reps entered yet) re-derives the target
+   for the same effort from the originally prescribed weight/target (pw/ptgt), so repeated edits never
+   compound rounding and going back to the programmed weight restores the programmed reps. */
+function retarget(s,oldW){
+  if(s.st||s.reps!=null) return;
+  if(s.pw===undefined){ if(s.tgt==null||!oldW) return; s.pw=oldW; s.ptgt=s.tgt; }
+  s.tgt=(!s.w||s.w===s.pw)?s.ptgt:equivalentReps(s.pw,s.ptgt,s.rir??rirFor(selWeek),s.w);
+}
+const setHint=s=>(!s.st&&s.pw!=null&&s.w&&s.w!==s.pw&&s.tgt!=null)
+  ?`↳ ${s.w} instead of ${s.pw}: ${s.tgt} reps instead of ${s.ptgt}, same effort at ${s.rir??rirFor(selWeek)} RIR`:'';
 async function upd(ei,si,f,v){
-  const s=entryAt(ei).sets[si];
+  const s=entryAt(ei).sets[si], oldW=s.w;
   s[f]=v===''?null:parseFloat(v); s.u=1;   /* u: user-touched, freezes this exercise's prescription */
+  if(f==='w') retarget(s,oldW);
   await save();
+  if(f==='w'){   /* update in place: a full re-render would steal focus from the next input */
+    if(s.reps==null&&!s.st) $(`r-${ei}-${si}`).value=s.tgt??'';
+    $(`h-${ei}-${si}`).innerHTML=setHint(s);
+  }
 }
 /* Log button: open set → logged (empty reps take the target); logged or skipped → open again,
    reps kept. An open set with no reps and no target needs a second tap to skip. */
@@ -1395,6 +1419,10 @@ function renderEngine(){
   <div class="eng-block"><h3>R8 · Soreness (recovery gate)</h3>
     <p>Asked per muscle: still sore → volume held. Never sore + low pump → strongest add signal (+${RULES.strongSetAdd} sets).
     'Healed just on time' is the optimum — standard progression.</p></div>
+  <div class="eng-block"><h3>Changing the weight</h3>
+    <p>Change a set's weight before logging it and its rep target is recalculated for the same effort at the week's RIR
+    (<code>1RM ≈ weight × (1 + reps/${RULES.epley})</code>, reps counted to failure). Back to the programmed weight restores the
+    programmed reps. Reps you type yourself are never changed.</p></div>
   <div class="eng-block"><h3>Cross-meso seeding</h3>
     <p>Exercises own their history. Returning after <code>>${RULES.staleWeeks} wks</code> → last load −${pct(RULES.staleDiscount)}%; sooner → last load as-is; week 1 always works to RIR.</p></div>`;
 }

@@ -794,3 +794,42 @@ describe('change a day\'s exercises (Phase 5)', () => {
     assert.equal(st.meso.log.w1d1[1].sets.length, 2);
   });
 });
+
+describe('rep targets follow weight changes (#4)', () => {
+  const s0 = app => app.state().meso.log.w2d3[3].sets[0];      // close-grip bench: 120 x 11 target
+
+  test('raising the weight lowers the target, and the new target is what gets logged', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('await upd(3,0,"w","130");');
+    assert.deepEqual([s0(app).w, s0(app).tgt, s0(app).reps], [130, 8, null]);
+    assert.equal(app.els.get('r-3-0').value, 8);
+    assert.match(app.els.get('h-3-0').innerHTML, /130 instead of 120: 8 reps instead of 11, same effort at 2 RIR/);
+    await app.call('await tapLog(3,0);');
+    assert.deepEqual([s0(app).st, s0(app).reps], ['logged', 8]);
+  });
+
+  test('lowering raises it; repeated edits are measured from the programmed numbers', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('await upd(3,0,"w","110"); await upd(3,0,"w","115"); await upd(3,0,"w","110");');
+    assert.equal(s0(app).tgt, 15);
+    await app.call('await upd(3,0,"w","120");');
+    assert.equal(s0(app).tgt, 11);
+    assert.equal(app.els.get('h-3-0').innerHTML, '');
+  });
+
+  test('reps you typed yourself, logged sets, and RIR-only sets are left alone', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('await upd(3,0,"reps","12"); await upd(3,0,"w","130");');
+    assert.deepEqual([s0(app).reps, s0(app).tgt], [12, 11]);
+    await app.call('await tapLog(3,1); await upd(3,1,"w","130");');
+    assert.equal(app.state().meso.log.w2d3[3].sets[1].reps, 10);
+    await app.call('await upd(3,2,"w","130");');                  // new set: RIR target only
+    assert.equal(app.state().meso.log.w2d3[3].sets[2].tgt, null);
+  });
+
+  test('next week progresses from what you actually did at the new weight', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('for (const j of [0,1]) { await upd(3,j,"w","130"); await tapLog(3,j); } await skipRest(3); await pickWeek(3);');
+    assert.deepEqual(app.state().meso.log.w3d3[3].sets.slice(0, 2), [target(130, 9), target(130, 8)]);
+  });
+});

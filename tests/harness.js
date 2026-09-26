@@ -66,12 +66,13 @@ function loadEngine({ now = Date.now() } = {}) {
   const ctx = vm.createContext({});
   freezeClock(ctx, now);
   vm.runInContext(engineSource(), ctx, { filename: 'index.html#engine' });
-  const fns = vm.runInContext('({ roundLoad, weeksSince, startingSets, prescribe, rirFor })', ctx);
+  const fns = vm.runInContext('({ roundLoad, weeksSince, startingSets, prescribe, rirFor, equivalentReps })', ctx);
   const consts = vm.runInContext('({ RIR_RAMP, DELOAD_RIR, RULES })', ctx);
   const wrap = f => (...args) => plain(f(...args));
   return {
     roundLoad: fns.roundLoad,
     rirFor: fns.rirFor,
+    equivalentReps: fns.equivalentReps,
     weeksSince: fns.weeksSince,
     startingSets: wrap(fns.startingSets),
     prescribe: wrap(fns.prescribe),
