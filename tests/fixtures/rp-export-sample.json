@@ -1,0 +1,26 @@
+[
+ {"id": 222, "name": "Sample meso B", "createdAt": "2026-07-28T10:00:00.000Z", "finishedAt": "2026-08-20T10:00:00.000Z", "updatedAt": "2026-08-20T10:00:00.000Z",
+  "weeks": [
+   {"days": [{"position": 0, "label": "Saturday", "bodyweight": 165, "bodyweightAt": "2026-08-01T14:00:00.000Z", "finishedAt": "2026-08-01T16:00:00.000Z",
+     "muscleGroups": [{"muscleGroupId": 3, "soreness": 1, "pump": 2, "workload": 1}, {"muscleGroupId": 2, "soreness": -1, "pump": 1, "workload": 1}],
+     "exercises": [
+      {"position": 0, "exerciseId": 236, "name": "Dip (Weighted, Triceps-Focused)", "muscleGroupId": 3, "jointPain": 0, "sets": [
+        {"position": 0, "weight": 225, "weightTarget": 225, "reps": 8, "repsTarget": 8, "bodyweight": 165, "status": "complete", "finishedAt": "2026-08-01T15:00:00.000Z"},
+        {"position": 1, "weight": null, "weightTarget": 225, "reps": null, "repsTarget": 7, "bodyweight": null, "status": "skipped", "finishedAt": null}]},
+      {"position": 1, "exerciseId": 901, "name": "Mystery Machine Row ", "muscleGroupId": 2, "jointPain": 0, "sets": [
+        {"position": 0, "weight": 100, "weightTarget": 100, "reps": 10, "repsTarget": 10, "bodyweight": null, "status": "complete", "finishedAt": "2026-08-01T15:20:00.000Z"}]},
+      {"position": 2, "exerciseId": 44, "name": "Pullup (Normal Grip)", "muscleGroupId": 2, "jointPain": 0, "sets": [
+        {"position": 0, "weight": 165, "weightTarget": 165, "reps": 9, "repsTarget": 9, "bodyweight": 165, "status": "complete", "finishedAt": "2026-08-01T15:40:00.000Z"}]}]}]},
+   {"days": [{"position": 0, "label": "Saturday", "bodyweight": 166, "bodyweightAt": "2026-08-08T14:00:00.000Z", "finishedAt": "2026-08-08T16:00:00.000Z",
+     "muscleGroups": [{"muscleGroupId": 3, "soreness": 0, "pump": 1, "workload": 1}],
+     "exercises": [
+      {"position": 0, "exerciseId": 236, "name": "Dip (Weighted, Triceps-Focused)", "muscleGroupId": 3, "jointPain": 0, "sets": [
+        {"position": 0, "weight": 231, "weightTarget": 230, "reps": 8, "repsTarget": 8, "bodyweight": 166, "status": "complete", "finishedAt": "2026-08-08T15:00:00.000Z"}]}]}]}]},
+ {"id": 111, "name": "Sample meso A", "createdAt": "2026-01-02T10:00:00.000Z", "finishedAt": "2026-02-01T10:00:00.000Z", "updatedAt": "2026-02-01T10:00:00.000Z",
+  "weeks": [
+   {"days": [{"position": 0, "label": "Monday", "bodyweight": null, "bodyweightAt": null, "finishedAt": "2026-01-10T16:00:00.000Z",
+     "muscleGroups": [],
+     "exercises": [
+      {"position": 0, "exerciseId": 7, "name": "Deadlift", "muscleGroupId": 2, "jointPain": null, "sets": [
+        {"position": 0, "weight": 200, "weightTarget": 200, "reps": 6, "repsTarget": 6, "bodyweight": null, "status": "complete", "finishedAt": "2026-01-10T15:00:00.000Z"}]}]}]}]}
+]

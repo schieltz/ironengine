@@ -176,6 +176,7 @@ nav button.active{color:var(--blue)}
 </nav>
 <div id="modalRoot"></div>
 <input type="file" id="importInput" accept=".json,application/json" hidden onchange="importFile(this)">
+<input type="file" id="rpInput" accept=".json,application/json" hidden onchange="importRPFile(this)">
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1133,7 +1134,7 @@ function renderLibraryList(){
         <span class="dot" style="background:var(--mg-${c.mg})"></span>
         <span class="li-main"><span class="li-name">${c.name}${c.custom?'<span class="badge-mine">MINE</span>':''}${c.home?'':'<span class="badge-gym">GYM</span>'}</span>
         <span class="li-sub">${cap(c.mg)} · ${c.equip}</span></span>
-        <span class="li-right">${h?`<div class="li-w">${h.w}</div>`:''}<div class="li-date">${c.last||''}</div></span>
+        <span class="li-right">${h?`<div class="li-w">${h.w}</div>`:''}<div class="li-date">${lastDone(c)}</div></span>
       </button>`;}).join('')||'<p style="color:var(--ink-faint);padding:20px;text-align:center">No matches</p>'}`;
 }
 
@@ -1181,10 +1182,12 @@ async function makeDraft(){
     days:M.days.map(day=>day.map(ex=>({name:ex.name,mg:ex.mg,equip:ex.equip,note:ex.note,pri:ex.pri??1})))};
   bdDay=1; await save(); render();
 }
+/* last time an exercise was done: history's date (from imports and finished mesos) or the catalog's */
+const lastDone=c=>{ const h=ST.hist[c.name], a=h&&h.date||'', b=c.last||''; return a>b?a:b; };
 /* most recently performed home-compatible exercise per mg, excluding already-used names */
 function autoPick(mg,used){
   const cands=CATALOG.filter(c=>c.mg===mg&&c.home&&!used.has(c.name))
-    .sort((a,b)=>(b.last||'').localeCompare(a.last||''));
+    .sort((a,b)=>lastDone(b).localeCompare(lastDone(a)));
   return cands[0]||CATALOG.find(c=>c.mg===mg&&c.home)||CATALOG.find(c=>c.mg===mg);
 }
 async function makeDraftFromTemplate(ti){
@@ -1535,6 +1538,9 @@ function renderData(){
     meso${ST.archive.length===1?'':'s'}, draft) in one file. Save it to Files or iCloud. Restoring replaces all current data.</p>
     <div class="card-actions"><button onclick="saveBackup()">Save backup file</button><button onclick="doExport()">Copy JSON</button></div>
     <div class="card-actions"><button onclick="$('importInput').click()">Restore from backup file</button></div></div>
+  <div class="eng-block"><h3>RP history</h3><p>Import your RP Hypertrophy data export. Past mesos go to the archive, and exercise
+    history and starting weights use your real numbers. The file is read on this device only; your current meso isn't changed.</p>
+    <div class="card-actions"><button onclick="$('rpInput').click()">Import RP export</button></div></div>
   <div class="eng-block"><h3>Bodyweight</h3><p>Weighted dips and pull-ups count bodyweight plus added weight when the engine
     decides between adding load or reps. Log added weight only on those exercises.</p>
     <input class="form-input" style="margin-top:10px" type="number" inputmode="decimal" id="bwInput" placeholder="Bodyweight (lb)"
@@ -1563,6 +1569,85 @@ async function saveBackup(){
 async function doExport(){
   try{ await navigator.clipboard.writeText(backupJSON()); toast('Copied'); }
   catch(e){ toast('Clipboard blocked — see console'); console.log(backupJSON()); }
+}
+/* ---------- import RP Hypertrophy history ----------
+   Converts RP's export into archived mesos in IRON ENGINE's own shape. RP stores total load for bodyweight
+   exercises (bodyweight + added); the app logs added weight only, so those are converted (bodyweight-only
+   sets get no weight). Each session's per-muscle feedback lands on that muscle's first exercise. */
+const RP_MG={1:'CHEST',2:'BACK',3:'TRICEPS',4:'BICEPS',5:'SHOULDERS',6:'QUADS',7:'GLUTES',8:'HAMSTRINGS',9:'CALVES'};
+const byPos=(a,b)=>a.position-b.position;
+function rpToMesos(data){
+  if(!Array.isArray(data)||!data.length||!data.every(m=>m&&Array.isArray(m.weeks)&&m.id!=null))
+    throw new Error('Not an RP Hypertrophy export');
+  return data.slice().sort((a,b)=>String(a.createdAt).localeCompare(String(b.createdAt))).map(m=>{
+    let seq=0; const slots={}, days=[], log={}, dates={}, schedule=[];
+    m.weeks.forEach((wk,wi)=>(wk.days||[]).slice().sort(byPos).forEach((dy,di)=>{
+      const k=key(wi+1,di+1), fbMg={}, fed=new Set();
+      if(schedule[di]==null) schedule[di]=(dy.label||'').slice(0,3)||`Day ${di+1}`;
+      (dy.muscleGroups||[]).forEach(g=>{ if(g.pump!=null)
+        fbMg[g.muscleGroupId]={soreness:g.soreness<0?null:g.soreness,pump:g.pump,workload:g.workload}; });
+      log[k]=(dy.exercises||[]).slice().sort(byPos).map(e=>{
+        const name=String(e.name).trim(), sk=di+':'+e.exerciseId, lib=libByName(name);
+        const bw=(e.sets||[]).map(s=>s.bodyweight).find(x=>x!=null)
+          ??(lib&&lib.equip==='Bodyweight Loadable'?dy.bodyweight:null);
+        /* exercises the catalog doesn't know: bodyweight-type if RP tracked bodyweight on them */
+        const heaviest=Math.max(0,...(e.sets||[]).map(s=>s.weight||s.weightTarget||0));
+        const equip=lib?lib.equip:bw?(heaviest>bw?'Bodyweight Loadable':'Bodyweight Only'):'Other';
+        if(!slots[sk]){
+          slots[sk]={id:'s'+(++seq),name,mg:lib?lib.mg:(RP_MG[e.muscleGroupId]||'BACK'),equip,note:null,pri:1};
+          (days[di]=days[di]||[]).push(slots[sk]);
+        }
+        const bwOnly=equip==='Bodyweight Only';
+        const sets=(e.sets||[]).slice().sort(byPos).map(s=>{
+          const done=s.status==='complete'&&s.reps!=null, raw=done?s.weight:s.weightTarget;
+          const w=bwOnly||raw==null?null:bw?(raw-bw>0?raw-bw:null):raw;
+          return {w,reps:done?s.reps:null,tgt:s.repsTarget??null,rir:null,st:done?'logged':s.status==='skipped'?'skipped':null};
+        });
+        const entry={slot:slots[sk].id,name,sets};
+        if(fbMg[e.muscleGroupId]&&!fed.has(e.muscleGroupId)){
+          entry.fb={...fbMg[e.muscleGroupId],pain:e.jointPain??0}; fed.add(e.muscleGroupId); }
+        return entry;
+      });
+      const when=(dy.exercises||[]).flatMap(e=>e.sets||[]).filter(s=>s.status==='complete'&&s.finishedAt)
+        .map(s=>s.finishedAt).sort()[0]||dy.finishedAt;
+      if(when&&log[k].some(e=>e.sets.some(s=>s.st==='logged'))) dates[k]=localDate(new Date(when));
+    }));
+    return {name:m.name,weeks:m.weeks.length,curWeek:1,curDay:1,days,seq,log,dates,schedule,dayOf:{},
+      archivedAt:String(m.finishedAt||m.updatedAt||'').slice(0,10)||null,source:'rp',rpId:m.id};
+  });
+}
+function rpBodyweight(data){
+  const ds=data.flatMap(m=>m.weeks.flatMap(w=>w.days||[])).filter(d=>d.bodyweight&&d.bodyweightAt)
+    .sort((a,b)=>String(b.bodyweightAt).localeCompare(String(a.bodyweightAt)));
+  return ds.length?ds[0].bodyweight:null;
+}
+async function importRPText(text){
+  let data, mesos;
+  try{ data=JSON.parse(text); mesos=rpToMesos(data); }catch(e){ toast(e instanceof SyntaxError?'Not a valid file':e.message); return false; }
+  const have=new Set(ST.archive.map(m=>m.rpId).filter(x=>x!=null)), fresh=mesos.filter(m=>!have.has(m.rpId));
+  if(!fresh.length){ toast('That RP history is already imported'); return false; }
+  const h={}; fresh.forEach(m=>harvestHistory(m,h));
+  const hist=Object.entries(h).filter(([n,v])=>{ const cur=ST.hist[n]; return !cur||(v.date&&(!cur.date||v.date>=cur.date)); });
+  const custom=[...new Map(fresh.flatMap(m=>m.days.flat()).filter(s=>!libByName(s.name)&&!/["<>\\]/.test(s.name))
+    .map(s=>[s.name,s])).values()];
+  const bw=ST.bodyweight?null:rpBodyweight(data);
+  const logged=fresh.reduce((n,m)=>n+Object.values(m.log).flat().reduce((a,e)=>a+e.sets.filter(s=>s.st==='logged').length,0),0);
+  const span=fresh.map(m=>Object.values(m.dates).sort()).flat().sort();
+  if(!confirm(`Import ${fresh.length} RP meso${fresh.length===1?'':'s'} (${span[0]||'?'} to ${span.at(-1)||'?'}), ${logged} logged sets?\n\n`
+    +`• Exercise history updated for ${hist.length} exercises\n• ${custom.length} exercise${custom.length===1?'':'s'} added to your library\n`
+    +(bw?`• Bodyweight set to ${bw} lb\n`:'')+`\nYour current meso isn't changed.`)) return false;
+  ST.archive.push(...fresh);
+  ST.archive.sort((a,b)=>String(a.archivedAt||'').localeCompare(String(b.archivedAt||'')));
+  hist.forEach(([n,v])=>{ ST.hist[n]=v; });
+  custom.forEach(s=>ST.custom.push({name:s.name,mg:s.mg,equip:s.equip,home:isHome(s),last:null,custom:true}));
+  if(bw) ST.bodyweight=bw;
+  await ensureDay(selWeek,selDay); await save(); render();
+  toast(`Imported ${fresh.length} mesos from RP`);
+  return true;
+}
+async function importRPFile(input){
+  const f=input.files&&input.files[0]; input.value='';
+  if(f) await importRPText(await f.text());
 }
 function parseBackup(text){
   let s;

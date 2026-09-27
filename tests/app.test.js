@@ -984,3 +984,60 @@ describe('calibrated engine in real sessions', () => {
     assert.deepEqual(app.state().meso.log.w3d1[0].sets.slice(0, 2), [target(45, 10), target(45, 9)]);
   });
 });
+
+describe('import RP history (#2)', () => {
+  const SAMPLE = require('node:fs').readFileSync(require('node:path').join(__dirname, 'fixtures', 'rp-export-sample.json'), 'utf8');
+  const importIt = (app, text = SAMPLE) => app.call(`await importRPText(${JSON.stringify(text)});`);
+
+  test('mesos go to the archive in IRON ENGINE\'s shape, dips as added weight', async () => {
+    const app = await bootApp({ now: NOW, confirm: () => true });
+    await importIt(app);
+    const st = app.state();
+    assert.deepEqual(st.archive.map(m => [m.name, m.rpId, m.source]), [['Sample meso A', 111, 'rp'], ['Sample meso B', 222, 'rp']]);
+    const b = st.archive[1];
+    assert.deepEqual(b.schedule, ['Sat']);
+    assert.deepEqual(b.log.w1d1[0].sets.map(s => [s.w, s.reps, s.st]), [[60, 8, 'logged'], [60, null, 'skipped']]);
+    assert.deepEqual(b.log.w2d1[0].sets.map(s => s.w), [65]);
+    assert.deepEqual(b.log.w1d1[0].fb, { soreness: 1, pump: 2, workload: 1, pain: 0 });
+    assert.equal(b.log.w1d1[2].sets[0].w, null);                        // pull-up: bodyweight only
+    assert.equal(b.log.w1d1[1].fb.soreness, null);                     // RP's -1 = not asked
+    assert.deepEqual(b.dates, { w1d1: '2026-08-01', w2d1: '2026-08-08' });
+  });
+
+  test('history, library and bodyweight pick up the real numbers; newer app history wins', async () => {
+    const app = await bootApp({ now: NOW, confirm: () => true });
+    await importIt(app);
+    const st = app.state();
+    assert.deepEqual(st.hist['Dip (Weighted, Triceps-Focused)'], { w: 65, date: '2026-08-08' });
+    assert.deepEqual(st.hist.Deadlift, { w: 300, date: '2026-07-04' });  // RP's Jan 2026 deadlift is older
+    assert.deepEqual(st.custom.map(c => [c.name, c.mg, c.equip]), [['Mystery Machine Row', 'BACK', 'Other']]);
+    assert.equal(st.bodyweight, 166);
+    await app.call("setView('library'); libHome=false; libQ='weighted, triceps'; renderLibrary();");
+    assert.match(app.els.get('libList').innerHTML, /2026-08-08/);
+  });
+
+  test('your current meso and an existing bodyweight are left alone', async () => {
+    const app = await bootApp({ now: NOW, confirm: () => true });
+    await app.call('await setBodyweight("170");');
+    const meso = app.state().meso;
+    await importIt(app);
+    assert.deepEqual(app.state().meso, meso);
+    assert.equal(app.state().bodyweight, 170);
+  });
+
+  test('importing twice adds nothing; declining the confirm changes nothing; junk is rejected', async () => {
+    let answer = true;
+    const app = await bootApp({ now: NOW, confirm: () => answer });
+    await importIt(app);
+    const once = app.state();
+    await importIt(app);
+    assert.deepEqual(app.state(), once);
+
+    const fresh = await bootApp({ now: NOW, confirm: () => false });
+    const before = fresh.state();
+    await importIt(fresh);
+    assert.deepEqual(fresh.state(), before);
+    await importIt(fresh, '{"not":"rp"}');
+    assert.deepEqual(fresh.state(), before);
+  });
+});
