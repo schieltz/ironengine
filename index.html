@@ -631,8 +631,8 @@ const RULES={
   cutPct:0.08,         // R3 load cut (60→55 verified; the 8% itself is inferred)
   floorReps:4,         // R3: a later set at or below this many reps triggers the cut
   painGate:2,          // R4: pain answer at or above this (2 = moderate) holds reps and sets
-  setAdd:1,            // R2: sets added per exercise per week
-  strongSetAdd:2,      // R5/R8: sets added on an under-stimulated signal
+  setAdd:1,            // R2/R5/R8: sets added when volume steps up (never more than one per muscle per session)
+  addWeek:2,           // R2: prescribing this week (the week 1→2 step) adds a set by default; later weeks hold
   staleWeeks:8,        // seeding: history older than this many weeks is discounted
   staleDiscount:0.10,  // seeding: discount on stale history
   epley:30,            // rep/load trade-off: 1RM ≈ weight × (1 + reps/epley)  (inferred; calibrate vs RP)
@@ -672,7 +672,8 @@ function startingSets(name,hist,rir,nSets,opts){
   if(maint) why.push(`Maintenance-priority slot: 1 starting set.`);
   return {sets:mk(w),why:why.join(' ')};
 }
-/* ex: {name, equip}. opts: {bodyweight} (for weighted bodyweight exercises). */
+/* ex: {name, equip}. opts: {bodyweight} for weighted bodyweight exercises; {allowAdd:false} when another
+   exercise of the same muscle already takes this session's added set. */
 function prescribe(ex, prevSets, week, feedback, opts){
   const rir = rirFor(week), o=opts||{}, inc=incFor(ex.equip);
   const why=[];
@@ -717,15 +718,24 @@ function prescribe(ex, prevSets, week, feedback, opts){
   if(painGate){ why.push(`Joint pain → weight and rep targets held, no set added (R4).`); return {sets,why:why.join(' ')}; }
   if(byReps) why.unshift(`Same weight, last week's reps <b>+1</b> (R1).`);
   if(byLoad) why.unshift(`<b>+${inc} lb</b>, same reps (R9: a ${inc} lb jump is under ${(RULES.loadModeMax*100).toFixed(1)}% of this load, so it progresses by load).`);
-  if(soreGate){ why.push(`Still sore from last session → volume held, no set added (R8).`); }
-  else if(f.workload===3){ why.push(`'Too much' workload → set count held (R5).`); }
-  else{
-    const strongAdd=(f.workload===0)||(f.soreness===0 && f.pump===0);
-    const adds=strongAdd?RULES.strongSetAdd:RULES.setAdd;
+  /* R2 (calibrated on the RP export): volume steps up once, week 1→2, unless a set hit the rep floor;
+     after that it holds unless feedback says under-stimulated (R5 'not enough', R8 never sore + low pump).
+     RP held set count ~75% of the time and almost never added two. */
+  const floorHit=logged.some((s,i)=>i>0&&s.reps<=RULES.floorReps);
+  const reason=soreGate?null:f.workload===3?null
+    :f.workload===0?`R5: 'not enough' workload`
+    :(f.soreness===0&&f.pump===0)?'R8: never sore + low pump'
+    :(week===RULES.addWeek&&!floorHit)?'R2: the week 1→2 volume step':null;
+  if(soreGate) why.push(`Still sore from last session → set count held (R8).`);
+  else if(f.workload===3) why.push(`'Too much' workload → set count held (R5).`);
+  else if(reason&&o.allowAdd===false) why.push(`Set count held: another exercise for this muscle takes today's added set (${reason.split(':')[0]}).`);
+  else if(reason){
     const lastW=sets[sets.length-1].w;
-    for(let a=0;a<adds;a++) sets.push({w:lastW,tgt:null,rir,st:null,reps:null});
-    why.push(`+${adds} set at <b>${lastW??'bodyweight'}</b> to <b>${rir} RIR</b> (R2${strongAdd?'+R5/R8: under-stimulated signal':''}).`);
+    for(let a=0;a<RULES.setAdd;a++) sets.push({w:lastW,tgt:null,rir,st:null,reps:null});
+    why.push(`+${RULES.setAdd} set at <b>${lastW??'bodyweight'}</b> to <b>${rir} RIR</b> (${reason}).`);
   }
+  else why.push(week===RULES.addWeek?`Set count held: a set hit the ${RULES.floorReps}-rep floor (R2).`
+    :`Set count held (R2: after week ${RULES.addWeek-1}, volume grows only when feedback says you're under-stimulated).`);
   return {sets,why:why.join(' ')};
 }
 /* ============================ @engine:end ============================== */
@@ -848,7 +858,10 @@ function planDay(w,d){ /* returns true when anything changed */
    seeded from history, which includes this meso's earlier sessions. */
 function prescribeEntry(w,d,e){
   const M=ST.meso, slot=M.days[d-1].find(s=>s.id===e.slot);
-  const ex={name:e.name,equip:exInfo(e.name,slot).equip}, opts={bodyweight:ST.bodyweight||0};
+  const ex={name:e.name,equip:exInfo(e.name,slot).equip};
+  const mgOf=x=>exInfo(x.name,M.days[d-1].find(s=>s.id===x.slot)).mg;
+  const firstOfMg=(M.log[key(w,d)]||[]).find(x=>mgOf(x)===mgOf(e));
+  const opts={bodyweight:ST.bodyweight||0,allowAdd:!firstOfMg||firstOfMg===e};
   for(let pw=w-1;pw>=1;pw--){
     const pe=(M.log[key(pw,d)]||[]).find(x=>x.slot===e.slot);
     if(!pe||pe.name!==e.name||!pe.sets) continue;
@@ -1479,20 +1492,22 @@ function renderEngine(){
     Otherwise it progresses by reps (R1). Bodyweight-only exercises always progress by reps; weighted dips and pull-ups
     count your bodyweight in the load. Matches 99% of RP's choices in your history.</p></div>
   <div class="eng-block"><h3>R2 · Set addition</h3>
-    <p>+${RULES.setAdd} set/exercise/week by default; new sets get weight only, worked to the week's RIR. Gated by R4/R5/R8.</p></div>
+    <p>Volume steps up once: going into week ${RULES.addWeek}, +${RULES.setAdd} set unless a set hit the rep floor. After that the set count holds
+    unless your feedback says you're under-stimulated (R5, R8). At most one added set per muscle per session, on its first exercise.
+    New sets get weight only, worked to the week's RIR. This is how RP behaved in your history (it held sets ~75% of the time).</p></div>
   <div class="eng-block"><h3>R3 · Load autoregulation</h3>
     <p>A later set at <code>≤${RULES.floorReps} reps</code> → <code>~${pct(RULES.cutPct)}%</code> load cut, RIR reset. Verified: 60×4 → RP prescribed 55.
     Sets that just fade from set 1 (above the floor) progress normally: RP never cut those in your history.</p></div>
   <div class="eng-block"><h3>R4 · Pain gate</h3>
     <p>Moderate+ joint pain → rep targets held, no set added.</p></div>
   <div class="eng-block"><h3>R5 · Workload feedback</h3>
-    <p><code>Too much</code> → hold set count. <code>Not enough</code> → +${RULES.strongSetAdd} sets.</p></div>
+    <p><code>Too much</code> → hold set count. <code>Not enough</code> → +${RULES.setAdd} set.</p></div>
   <div class="eng-block"><h3>R6 · Missing data</h3>
     <p>All sets skipped → same weights re-prescribed, RIR target only. Matches RP.</p></div>
   <div class="eng-block"><h3>R7 · Deload</h3>
     <p>Week ${RIR_RAMP.length+1}: half the sets at ${DELOAD_RIR} RIR.</p></div>
   <div class="eng-block"><h3>R8 · Soreness (recovery gate)</h3>
-    <p>Asked per muscle: still sore → volume held. Never sore + low pump → strongest add signal (+${RULES.strongSetAdd} sets).
+    <p>Asked per muscle: still sore → volume held. Never sore + low pump → +${RULES.setAdd} set.
     'Healed just on time' is the optimum — standard progression.</p></div>
   <div class="eng-block"><h3>Changing the weight</h3>
     <p>Change a set's weight before logging it and its rep target is recalculated for the same effort at the week's RIR

@@ -39,13 +39,13 @@ Live: https://schieltz.github.io/ironengine/
 |------|----------|------------|
 | R1 | Same weight, prior week reps +1 per set | VERIFIED vs RP exactly; RP export: 92% of 858 same-weight targets |
 | R9 | Load or reps: +1 jump (5 lb; 2.5 lb cable/machine, `RULES.increments`), same reps, when the jump is ≤3.8% of the load (`RULES.loadModeMax`); otherwise R1 (+1 rep). Bodyweight-only → always reps; weighted bodyweight → load includes `ST.bodyweight` (v8, Data tab) | VERIFIED by RP export: fits 99% of 1,195 targets; examples pinned as fixtures |
-| R2 | +1 set/exercise/week; new sets get weight + RIR target only | CONTRADICTED by RP export: RP held set count 74% of the time; adds are per muscle group and feedback-driven. Current rule matches RP's next-week set count 18% |
+| R2 | Volume steps once: prescribing week 2 (`RULES.addWeek`) adds +1 set unless a later set hit the rep floor; after that the set count holds unless R5 ('not enough') or R8 (never sore + low pump) → +1 (was +2). At most one added set per muscle per session, on its first exercise (`opts.allowAdd`, from `prescribeEntry`) | Calibrated on RP export: set count agreement 19% → 68%. Keeps the VERIFIED bench (+1, week 2) and incline (2 sets) fixtures |
 | R3 | A later set at ≤4 reps → ~8% load cut, RIR reset. Load is held (never raised) when rounding cancels the cut or the set is bodyweight | VERIFIED (60×4 → 55; the only floor case in 18 months of RP data). The 8% is inferred (60→55 fits 4.2-12.5%). The former ≥3-below-set-1 trigger was removed: RP export 82/82 held or raised the load |
 | R4 | Joint pain ≥ moderate → hold reps, no set add | Inferred |
-| R5 | Workload 'too much' → hold sets; 'not enough' → +2 | Inferred |
+| R5 | Workload 'too much' → hold sets; 'not enough' → +1 | Inferred; RP rarely adds 2 |
 | R6 | All sets skipped → re-prescribe same weights, RIR only | VERIFIED; RP export: same weights 85%, extra set only 7% (Q2 settled: no add) |
 | R7 | Deload wk 6: half sets, 8 RIR (also when week 5 was fully skipped) | CONTRADICTED on load by RP export: RP deload cut weight ~10% (sometimes 50%) and reps |
-| R8 | Soreness: still sore → hold volume; never sore + low pump → +2 sets | Inferred |
+| R8 | Soreness: still sore → hold volume; never sore + low pump → +1 set | Inferred; RP adds mostly after 'never sore' |
 | Weight change | Set's weight edited before logging (no reps typed) → rep target re-derived for equal effort at the week's RIR: Epley on reps-to-failure, `RULES.epley`=30, measured from the originally prescribed weight/target (`pw`/`ptgt` on the set); hint line under the set | Inferred (owner request 2026-09-26); calibrate vs RP |
 | Seeding | Wk 1 from hist; >8 wks stale → −10%; maintenance-priority slots start 1 set, full 2 | Design decision |
 
@@ -92,7 +92,6 @@ Run `npm test` (Node 20+, zero dependencies). Every engine change must pass it b
 - `tests/harness.js`: extracts the engine block (between the `@engine:begin` and `@engine:end` markers) and runs it in a node `vm` sandbox with a frozen clock. Can also boot the whole inline script against a DOM stub. `IRONENGINE_HTML=path` points it at another copy (used for mutation checks).
 - `tests/engine.test.js`: parse check of the full script; single-file and engine-purity guards; the three VERIFIED fixtures (bench 120×10/9 → 120×11/10/+120@2RIR; DB incline 60×5/4 → 60×6, 55@2RIR; skipped → same weights @ RIR); R3 thresholds and the 8% coefficient; R4, R5, R7, R8; cross-meso seeding (recent, 8-week boundary, stale −10%, no history, maintenance); a "why" on every prescription.
 - `tests/app.test.js`: VERIFIED fixtures again through the real `ensureDay()` path on the seed (w1d3 → w2d3); storage adapter guard (window.storage present → localStorage never touched; absent → `ironengine:` prefix, reload restores).
-- Open `todo` test: DB incline set count. HANDOFF lists 2 sets; engine emits 3 (R2 adds a set after the R3 cut). Resolve with the RP screenshot, then make it a hard assertion.
 - New RP-verified behavior from calibration becomes a permanent fixture in the VERIFIED block.
 - `tests/calibration.test.js`: replays 721 anonymized cases from the owner's RP export (`tests/fixtures/rp-calibration.json`, built by `node tools/rp-calibration.js <export.json>`; weights, reps and feedback only, bodyweight-only weights blanked) through the engine and reports agreement with RP's actual next-week prescriptions. `FLOORS` hold the agreement the current rules reach; a rule change must not drop below them, and raises them when it improves agreement.
 

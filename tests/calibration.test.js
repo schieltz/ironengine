@@ -16,11 +16,11 @@ const FIXTURE = path.join(__dirname, 'fixtures', 'rp-calibration.json');
 const E = loadEngine({ now: Date.parse('2026-09-27T12:00:00Z') });
 
 const FLOORS = {
-  weight: 0.93,        // share of RP-targeted sets where the engine's weight matches RP's
-  weightAndReps: 0.79, // ... where weight and rep target both match
-  setCount: 0.19,      // share of exercises where next week's set count matches RP's
+  weight: 0.96,        // share of RP-targeted sets where the engine's weight matches RP's
+  weightAndReps: 0.85, // ... where weight and rep target both match
+  setCount: 0.68,      // share of exercises where next week's set count matches RP's
   deloadWeight: 0.00,  // deload: first set's weight matches RP's
-  deloadSets: 0.15,    // deload: set count matches RP's
+  deloadSets: 0.39,    // deload: set count matches RP's
 };
 
 function run(cases) {
@@ -31,7 +31,10 @@ function run(cases) {
     if (!logged.length) continue;
     const fb = c.fb && { soreness: c.fb[0], pump: c.fb[1], workload: c.fb[2] };
     const ex = { name: c.ex, equip: c.eq };
-    const out = E.prescribe(ex, prev, c.wk, fb, { day: c.day, days: c.days, allowAdd: c.first, bodyweight: 0 }).sets;
+    /* RP mesos run 4-8 weeks; the engine's plan is RIR_RAMP.length weeks + a deload, so map RP's deload onto
+       the engine's deload week and cap RP's longer accumulation phases at the engine's last hard week. */
+    const wk = c.dl ? E.RIR_RAMP.length + 1 : Math.min(c.wk, E.RIR_RAMP.length);
+    const out = E.prescribe(ex, prev, wk, fb, { day: c.day, days: c.days, allowAdd: c.first, bodyweight: 0 }).sets;
     if (c.dl) {
       m.dl++;
       if (out[0] && c.rp[0][0] != null && out[0].w === c.rp[0][0]) m.dlWeight++;

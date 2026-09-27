@@ -52,7 +52,7 @@ describe('VERIFIED fixtures through the real ensureDay() path on the seed (w1d3 
     assert.deepEqual(w2d3[3], [target(120, 11), target(120, 10), rirOnly(120, 2)]);
 
     assert.equal(day[4], 'Dumbbell Press (High Incline)');
-    assert.deepEqual(w2d3[4].slice(0, 2), [target(60, 6), rirOnly(55, 2)]);
+    assert.deepEqual(w2d3[4], [target(60, 6), rirOnly(55, 2)]);            // Q1: 2 sets, RP export
 
     assert.equal(day[5], 'Barbell Bent Over Row');
     assert.deepEqual(w2d3[5], [rirOnly(120, 2), rirOnly(120, 2)]);
@@ -212,7 +212,7 @@ describe('provisional prescriptions (looking ahead never freezes numbers)', () =
     await logReps(app, 'w2d3', 3, [11, 10, 9]);
     await app.call('await pickWeek(3);');
     const st = app.state();
-    assert.deepEqual(st.meso.log.w3d3[3].sets, [target(120, 12), target(120, 11), target(120, 10), rirOnly(120, 2)]);
+    assert.deepEqual(st.meso.log.w3d3[3].sets, [target(120, 12), target(120, 11), target(120, 10)]);
     assert.match(st.meso.log.w3d3[3].why, /R1/);
   });
 
@@ -263,7 +263,7 @@ describe('feedback belongs to one session (C2)', () => {
 
     await logReps(app, 'w3d2', 2, [12, 11]);
     await app.call('await pickWeek(4);');
-    assert.deepEqual(app.state().meso.log.w4d2[2].sets, [target(120, 13), target(120, 12), rirOnly(120, 1)]);
+    assert.deepEqual(app.state().meso.log.w4d2[2].sets, [target(120, 13), target(120, 12)]);
   });
 
   test('feedback given after peeking at next week still takes effect', async () => {
@@ -717,7 +717,7 @@ describe('change a day\'s exercises (Phase 5)', () => {
     await app.call('await pickWeek(3);');
     st = app.state();
     assert.deepEqual(names(st, 'w3d3').slice(3, 5), ['Dumbbell Press (High Incline)', 'Bench Press (Close Grip)']);
-    assert.deepEqual(st.meso.log.w3d3[4].sets, [target(120, 12), target(120, 11), target(120, 10), rirOnly(120, 2)]);
+    assert.deepEqual(st.meso.log.w3d3[4].sets, [target(120, 12), target(120, 11), target(120, 10)]);
   });
 
   test('remove from plan: gone from today and later weeks, kept in history', async () => {
@@ -765,7 +765,7 @@ describe('change a day\'s exercises (Phase 5)', () => {
     await app.call(`for (const j of [0,1]) { await upd(${i},j,"w","25"); await upd(${i},j,"reps","12"); await tapLog(${i},j); }`);
     await app.call('await pickWeek(3);');
     const st = app.state(), e = st.meso.log.w3d3.find(x => x.name === 'Hammer Curl');
-    assert.deepEqual(e.sets, [target(25, 13), target(25, 13), rirOnly(25, 2)]);
+    assert.deepEqual(e.sets, [target(25, 13), target(25, 13)]);
     assert.ok(planNames(st, 3).includes('Hammer Curl'));
   });
 
@@ -867,7 +867,7 @@ describe('remove sets (#2)', () => {
   test('next week progresses from the sets you kept', async () => {
     const app = await bootApp({ now: NOW });
     await app.call('await removeSet(3); await tapLog(3,0); await tapLog(3,1); await pickWeek(3);');
-    assert.deepEqual(app.state().meso.log.w3d3[3].sets, [target(120, 12), target(120, 11), rirOnly(120, 2)]);
+    assert.deepEqual(app.state().meso.log.w3d3[3].sets, [target(120, 12), target(120, 11)]);
   });
 });
 

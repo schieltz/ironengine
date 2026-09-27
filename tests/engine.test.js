@@ -53,11 +53,14 @@ describe('VERIFIED vs RP (ground truth: change only with new RP screenshots)', (
     assert.match(p.why, /R3/);
   });
 
-  test('DB incline set count matches RP', {
-    todo: 'RP export confirms 2 sets (60x6, 55). Engine emits 3 because R2 adds a set by default; becomes a hard assertion when R2 is recalibrated.',
-  }, () => {
+  test('DB incline: exactly 2 sets, no set added after the cut (RP export, week 2 Friday)', () => {
     const p = E.prescribe(EX, [L(60, 5), L(60, 4)], 2, null);
-    assert.equal(p.sets.length, 2);
+    assert.deepEqual(p.sets, [target(60, 6), rirOnly(55, 2)]);
+  });
+
+  test('close-grip bench with the feedback actually given that day (soreness 1, pump 2, workload 1)', () => {
+    const p = E.prescribe(EX, [L(120, 10), L(120, 9)], 2, { soreness: 1, pain: 0, pump: 2, workload: 1 });
+    assert.deepEqual(p.sets, [target(120, 11), target(120, 10), rirOnly(120, 2)]);
   });
 
   test('all sets skipped -> same weights re-prescribed, RIR target only', () => {
@@ -126,7 +129,7 @@ describe('R4 pain gate', () => {
 
   test('pain=1 (low) -> normal progression', () => {
     const p = E.prescribe(EX, [L(100, 10), L(100, 9)], 3, fb({ pain: 1 }));
-    assert.deepEqual(p.sets, [target(100, 11), target(100, 10), rirOnly(100, 2)]);
+    assert.deepEqual(p.sets, [target(100, 11), target(100, 10)]);
   });
 
   test('pain gate overrides "not enough" workload', () => {
@@ -142,9 +145,22 @@ describe('R5 workload', () => {
     assert.match(p.why, /R5/);
   });
 
-  test('"not enough" -> +2 sets', () => {
+  test('"not enough" -> +1 set (RP almost never added two)', () => {
     const p = E.prescribe(EX, [L(100, 10), L(100, 9)], 3, fb({ workload: 0 }));
-    assert.deepEqual(p.sets.slice(2), [rirOnly(100, 2), rirOnly(100, 2)]);
+    assert.deepEqual(p.sets.slice(2), [rirOnly(100, 2)]);
+    assert.match(p.why, /R5/);
+  });
+});
+
+describe('R2 volume steps (calibrated on the RP export)', () => {
+  test('week 1 -> 2 adds a set by default; week 3 without an under-stimulation signal holds', () => {
+    assert.equal(E.prescribe(EX, [L(100, 10), L(100, 9)], 2, null).sets.length, 3);
+    assert.equal(E.prescribe(EX, [L(100, 10), L(100, 9)], 3, null).sets.length, 2);
+  });
+  test('only the first exercise of a muscle gets the session\'s added set', () => {
+    const p = E.prescribe(EX, [L(100, 10), L(100, 9)], 2, null, { allowAdd: false });
+    assert.equal(p.sets.length, 2);
+    assert.match(p.why, /another exercise for this muscle/);
   });
 });
 
@@ -186,19 +202,21 @@ describe('R8 soreness gate', () => {
     assert.equal(p.sets.length, 1);
   });
 
-  test('never sore + low pump -> +2 sets', () => {
+  test('never sore + low pump -> +1 set', () => {
     const p = E.prescribe(EX, [L(100, 10)], 3, fb({ soreness: 0, pump: 0 }));
-    assert.equal(p.sets.length, 3);
+    assert.equal(p.sets.length, 2);
+    assert.match(p.why, /R8/);
   });
 
-  test('never sore + moderate pump -> +1 set', () => {
+  test('never sore + moderate pump, week 3 -> set count held', () => {
     const p = E.prescribe(EX, [L(100, 10)], 3, fb({ soreness: 0, pump: 1 }));
-    assert.equal(p.sets.length, 2);
+    assert.equal(p.sets.length, 1);
   });
 
-  test('healed just on time -> standard +1 set', () => {
+  test('healed just on time, week 3 -> set count held, and the why says so', () => {
     const p = E.prescribe(EX, [L(100, 10)], 3, fb({ soreness: 2 }));
-    assert.equal(p.sets.length, 2);
+    assert.equal(p.sets.length, 1);
+    assert.match(p.why, /Set count held/);
   });
 });
 
