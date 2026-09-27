@@ -164,29 +164,28 @@ describe('R2 volume steps (calibrated on the RP export)', () => {
   });
 });
 
-describe('R7 deload (week 6)', () => {
-  const cases = [[4, 2], [3, 2], [2, 1], [1, 1]];
-  for (const [logged, expected] of cases) {
-    test(`${logged} logged sets -> ${expected} set(s) at 8 RIR, same weights`, () => {
-      const prev = Array.from({ length: logged }, (_, i) => L(100 + i * 5, 8));
-      const p = E.prescribe(EX, prev, 6, null);
-      assert.deepEqual(p.sets, prev.slice(0, expected).map(s => rirOnly(s.w, 8)));
-      assert.match(p.why, /R7/);
-    });
-  }
-
-  for (const [skipped, expected] of [[4, 2], [3, 2], [1, 1]]) {
-    test(`week 5 fully skipped (${skipped} sets) -> deload still halves to ${expected}`, () => {
-      const prev = Array.from({ length: skipped }, (_, i) => S(100 + i * 5));
-      const p = E.prescribe(EX, prev, 6, null);
-      assert.deepEqual(p.sets, prev.slice(0, expected).map(s => rirOnly(s.w, 8)));
-      assert.match(p.why, /R6\+R7/);
-    });
-  }
-
+describe('R7 deload (week 6, calibrated on the RP export)', () => {
+  const DB = { name: 'Dumbbell lift', equip: 'Dumbbell' };
+  test('first half of the week: 2 sets at ~90% of last week\'s load, ~60% of the reps', () => {
+    const p = E.prescribe(DB, [L(120, 10), L(120, 9), L(120, 8), L(120, 8)], 6, null, { day: 1, days: 3 });
+    assert.deepEqual(p.sets, [target(110, 6), target(110, 5)]);
+    assert.match(p.why, /R7/);
+  });
+  test('VERIFIED-consistent (RP export): day 3 of 3 at half load, e.g. 60 -> 30', () => {
+    const p = E.prescribe(DB, [L(60, 8), L(60, 8)], 6, null, { day: 3, days: 3 });
+    assert.deepEqual(p.sets, [target(30, 5), target(30, 5)]);
+  });
+  test('an exercise with one logged set still deloads with 2 sets', () => {
+    assert.equal(E.prescribe(DB, [L(100, 10)], 6, null, { day: 1, days: 3 }).sets.length, 2);
+  });
+  test('week 5 fully skipped: planned weights lightened, RIR target only', () => {
+    const p = E.prescribe(DB, [S(100), S(100), S(100)], 6, null, { day: 2, days: 3 });
+    assert.deepEqual(p.sets, [rirOnly(90, 8), rirOnly(90, 8)]);
+    assert.match(p.why, /wasn't logged/);
+  });
   test('deload ignores feedback gates', () => {
-    const p = E.prescribe(EX, [L(100, 8), L(100, 8)], 6, fb({ workload: 0, soreness: 0, pump: 0 }));
-    assert.equal(p.sets.length, 1);
+    const p = E.prescribe(DB, [L(100, 8), L(100, 8)], 6, fb({ workload: 0, soreness: 0, pump: 0 }), { day: 1, days: 3 });
+    assert.equal(p.sets.length, 2);
   });
 });
 

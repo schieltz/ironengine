@@ -19,8 +19,8 @@ const FLOORS = {
   weight: 0.96,        // share of RP-targeted sets where the engine's weight matches RP's
   weightAndReps: 0.85, // ... where weight and rep target both match
   setCount: 0.68,      // share of exercises where next week's set count matches RP's
-  deloadWeight: 0.00,  // deload: first set's weight matches RP's
-  deloadSets: 0.39,    // deload: set count matches RP's
+  deloadWeight: 0.68,  // deload: first set's weight matches RP's
+  deloadSets: 0.64,    // deload: set count matches RP's
 };
 
 function run(cases) {

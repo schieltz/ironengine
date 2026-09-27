@@ -638,6 +638,9 @@ const RULES={
   epley:30,            // rep/load trade-off: 1RM ≈ weight × (1 + reps/epley)  (inferred; calibrate vs RP)
   loadModeMax:0.038,   // R9: add load instead of a rep when one jump is at most this share of the load (RP fit 99%)
   increments:{Cable:2.5,Machine:2.5},   // R9: lb per jump by equipment; everything else uses loadStep
+  deloadSets:2,        // R7: sets per exercise in the deload week
+  deloadLoad:[0.9,0.5],// R7: load vs last week, first half of the week / second half
+  deloadReps:0.6,      // R7: rep target vs last week's reps
 };
 const pct=x=>Math.round(x*100);
 function rirFor(week){ return week>RIR_RAMP.length ? DELOAD_RIR : RIR_RAMP[week-1]; }
@@ -653,6 +656,19 @@ const incFor=equip=>RULES.increments[equip]||RULES.loadStep;
 function loadMode(ex,w,bodyweight){
   if(!w||ex.equip==='Bodyweight Only') return false;
   return incFor(ex.equip)/(w+(ex.equip==='Bodyweight Loadable'?(bodyweight||0):0))<=RULES.loadModeMax;
+}
+const roundTo=(w,step)=>Math.max(step,Math.round(w/step)*step);
+/* R7 (calibrated on the RP export): deload = RULES.deloadSets sets per exercise; the first half of the week at
+   ~90% of last week's load, the second half at ~50%; rep targets ~60% of last week's reps. */
+function deloadSets(ex,src,logged,day,days){
+  const factor=day>Math.ceil((days||3)/2)?RULES.deloadLoad[1]:RULES.deloadLoad[0], inc=incFor(ex.equip);
+  const sets=Array.from({length:RULES.deloadSets},(_,i)=>{
+    const s=src[Math.min(i,src.length-1)];
+    return {w:s.w?roundTo(s.w*factor,inc):s.w,tgt:logged?Math.max(1,Math.round(s.reps*RULES.deloadReps)):null,
+      rir:logged?null:DELOAD_RIR,st:null,reps:null};
+  });
+  return {sets,why:`Deload: <b>${sets.length} sets</b> at ~${pct(factor)}% of last week's load${logged
+    ?`, about ${pct(RULES.deloadReps)}% of last week's reps`:` (last week wasn't logged), ${DELOAD_RIR} RIR`} — dissipate fatigue (R7).`};
 }
 function roundLoad(w){ return Math.max(RULES.minLoad,Math.round(w/RULES.loadStep)*RULES.loadStep); }
 function weeksSince(dateStr){
@@ -673,26 +689,19 @@ function startingSets(name,hist,rir,nSets,opts){
   return {sets:mk(w),why:why.join(' ')};
 }
 /* ex: {name, equip}. opts: {bodyweight} for weighted bodyweight exercises; {allowAdd:false} when another
-   exercise of the same muscle already takes this session's added set. */
+   exercise of the same muscle already takes this session's added set; {day, days} place the session in the
+   week (the deload lightens more in its second half). */
 function prescribe(ex, prevSets, week, feedback, opts){
   const rir = rirFor(week), o=opts||{}, inc=incFor(ex.equip);
   const why=[];
   const logged=(prevSets||[]).filter(s=>s && s.st==='logged' && s.reps!=null);
   if(!prevSets || logged.length===0){
     let src=prevSets&&prevSets.length?prevSets:[{w:0}];
-    if(week>RIR_RAMP.length){   /* deload still halves the sets when last week was skipped */
-      src=src.slice(0,Math.max(1,Math.ceil(src.length/2)));
-      return {sets:src.map(s=>({w:s.w,tgt:null,rir,st:null,reps:null})),
-        why:`No logged sets last week → same weights; deload: <b>${src.length} set${src.length>1?'s':''}</b> at ${DELOAD_RIR} RIR (R6+R7).`};
-    }
+    if(week>RIR_RAMP.length) return deloadSets(ex,src,false,o.day,o.days);   /* R6+R7 */
     const base=src.map(s=>({w:s.w,tgt:null,rir,st:null,reps:null}));
     return {sets:base,why:`No logged sets last week → same weights, work to <b>${rir} RIR</b> (R6).`};
   }
-  if(week>RIR_RAMP.length){
-    const n=Math.max(1,Math.ceil(logged.length/2));
-    return {sets:logged.slice(0,n).map(s=>({w:s.w,tgt:null,rir:DELOAD_RIR,st:null,reps:null})),
-      why:`Deload: <b>${n} set${n>1?'s':''}</b> at ${DELOAD_RIR} RIR — dissipate fatigue (R7).`};
-  }
+  if(week>RIR_RAMP.length) return deloadSets(ex,logged,true,o.day,o.days);
   const f=feedback||{};
   const painGate=f.pain>=RULES.painGate, soreGate=f.soreness===3;
   let byLoad=0, byReps=0;
@@ -861,14 +870,15 @@ function prescribeEntry(w,d,e){
   const ex={name:e.name,equip:exInfo(e.name,slot).equip};
   const mgOf=x=>exInfo(x.name,M.days[d-1].find(s=>s.id===x.slot)).mg;
   const firstOfMg=(M.log[key(w,d)]||[]).find(x=>mgOf(x)===mgOf(e));
-  const opts={bodyweight:ST.bodyweight||0,allowAdd:!firstOfMg||firstOfMg===e};
+  const opts={bodyweight:ST.bodyweight||0,allowAdd:!firstOfMg||firstOfMg===e,day:d,days:DAYS.length};
   for(let pw=w-1;pw>=1;pw--){
     const pe=(M.log[key(pw,d)]||[]).find(x=>x.slot===e.slot);
     if(!pe||pe.name!==e.name||!pe.sets) continue;
     if(pw===w-1){
       const p=prescribe(ex,pe.sets,w,pe.fb||null,opts);
-      if(!pe.sets.some(s=>s.st)) p.why=`Preview: day ${d} of week ${w-1} isn't logged yet, so this repeats its weights `
-        +`at <b>${rirFor(w)} RIR</b>${w>RIR_RAMP.length?', half the sets (deload)':''}. Updates automatically once you log it.`;
+      if(!pe.sets.some(s=>s.st)) p.why=`Preview: day ${d} of week ${w-1} isn't logged yet, so this `
+        +(w>RIR_RAMP.length?`lightens its planned weights for the deload (R7)`:`repeats its weights at <b>${rirFor(w)} RIR</b>`)
+        +`. Updates automatically once you log it.`;
       return p;
     }
     const p=prescribe(ex,pe.sets.map(s=>({...s,st:'skipped'})),w,null,opts);
@@ -1505,7 +1515,8 @@ function renderEngine(){
   <div class="eng-block"><h3>R6 · Missing data</h3>
     <p>All sets skipped → same weights re-prescribed, RIR target only. Matches RP.</p></div>
   <div class="eng-block"><h3>R7 · Deload</h3>
-    <p>Week ${RIR_RAMP.length+1}: half the sets at ${DELOAD_RIR} RIR.</p></div>
+    <p>Week ${RIR_RAMP.length+1}: ${RULES.deloadSets} sets per exercise at ~${pct(RULES.deloadLoad[0])}% of last week's load early in the week and
+    ~${pct(RULES.deloadLoad[1])}% in its second half, with rep targets ~${pct(RULES.deloadReps)}% of last week's. How RP deloaded you.</p></div>
   <div class="eng-block"><h3>R8 · Soreness (recovery gate)</h3>
     <p>Asked per muscle: still sore → volume held. Never sore + low pump → +${RULES.setAdd} set.
     'Healed just on time' is the optimum — standard progression.</p></div>
