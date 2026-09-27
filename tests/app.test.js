@@ -962,3 +962,25 @@ describe('training days can be any weekday (#1)', () => {
     assert.deepEqual(st.meso.dayOf, {});
   });
 });
+
+describe('calibrated engine in real sessions', () => {
+  test('two exercises for one muscle: only the first gets the week 1 -> 2 added set', async () => {
+    const app = await bootApp({ now: NOW, confirm: () => true });
+    await app.call('await makeDraft(); await activateDraft();');           // Mon: weighted dip, then pushdown (both triceps)
+    const w1 = app.state().meso.log.w1d1;
+    assert.deepEqual([w1[0].name, w1[1].name], ['Dip (Weighted, Triceps-Focused)', 'Cable Triceps Pushdown (Bar)']);
+    await app.call(`for (const i of [0,1]) for (const j of [0,1]) {
+      await upd(i,j,"w","40"); await upd(i,j,"reps","10"); await tapLog(i,j); }
+      await pickWeek(2);`);
+    const w2 = app.state().meso.log.w2d1;
+    assert.equal(w2[0].sets.length, 3);
+    assert.equal(w2[1].sets.length, 2);
+    assert.match(w2[1].why, /another exercise for this muscle/);
+  });
+
+  test('bodyweight setting feeds weighted dips: 40 added at 165 lb progresses by load', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('await setBodyweight("165"); selDay=1; await pickWeek(3);');   // w2d1 dip: 40x10, 40x9 logged
+    assert.deepEqual(app.state().meso.log.w3d1[0].sets.slice(0, 2), [target(45, 10), target(45, 9)]);
+  });
+});
