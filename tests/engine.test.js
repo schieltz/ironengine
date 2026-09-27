@@ -54,7 +54,7 @@ describe('VERIFIED vs RP (ground truth: change only with new RP screenshots)', (
   });
 
   test('DB incline set count matches RP', {
-    todo: 'HANDOFF lists 2 sets (60x6, 55@2RIR); engine emits 3 because R2 adds a set after the R3 cut. Needs the RP screenshot to settle.',
+    todo: 'RP export confirms 2 sets (60x6, 55). Engine emits 3 because R2 adds a set by default; becomes a hard assertion when R2 is recalibrated.',
   }, () => {
     const p = E.prescribe(EX, [L(60, 5), L(60, 4)], 2, null);
     assert.equal(p.sets.length, 2);

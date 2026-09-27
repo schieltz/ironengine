@@ -36,13 +36,13 @@ Live: https://schieltz.github.io/ironengine/
 ## Engine rules (R1–R8)
 | Rule | Behavior | Validation |
 |------|----------|------------|
-| R1 | Same weight, prior week reps +1 per set | VERIFIED vs RP exactly |
-| R2 | +1 set/exercise/week; new sets get weight + RIR target only | Inferred, mechanism confirmed. History shows no weekly adds on EZ curl (lead only, see Calibration evidence) |
-| R3 | Later sets ≤4 reps or ≥3 below set 1 → ~8% load cut, RIR reset. Load is held (never raised) when rounding cancels the cut or the set is bodyweight; the "why" names the trigger | VERIFIED (60×4 → 55 exact match). The 8% is inferred: 60→55 fits any 4.2-12.5% cut. Set count after the cut (2 vs 3) unconfirmed. Only the ≤4-rep floor trigger is verified; the ≥3-below-set-1 trigger is doubtful (history leads, not proof) |
+| R1 | Same weight, prior week reps +1 per set | VERIFIED vs RP exactly; RP export: 92% of 858 same-weight targets |
+| R2 | +1 set/exercise/week; new sets get weight + RIR target only | CONTRADICTED by RP export: RP held set count 74% of the time; adds are per muscle group and feedback-driven. Current rule matches RP's next-week set count 18% |
+| R3 | Later sets ≤4 reps or ≥3 below set 1 → ~8% load cut, RIR reset. Load is held (never raised) when rounding cancels the cut or the set is bodyweight; the "why" names the trigger | VERIFIED (60×4 → 55 exact match). The 8% is inferred: 60→55 fits any 4.2-12.5% cut. Set count after the cut (2 vs 3) unconfirmed. Floor trigger (≤4 reps) verified, the only case in 18 months. The ≥3-below-set-1 trigger is CONTRADICTED by RP export: 82 of 82 cases RP held or raised the load |
 | R4 | Joint pain ≥ moderate → hold reps, no set add | Inferred |
 | R5 | Workload 'too much' → hold sets; 'not enough' → +2 | Inferred |
-| R6 | All sets skipped → re-prescribe same weights, RIR only | VERIFIED |
-| R7 | Deload wk 6: half sets, 8 RIR (also when week 5 was fully skipped) | Per RP docs. Doubtful on load: logged deload day 3 was half weight (60 → 30×5,5); lead only |
+| R6 | All sets skipped → re-prescribe same weights, RIR only | VERIFIED; RP export: same weights 85%, extra set only 7% (Q2 settled: no add) |
+| R7 | Deload wk 6: half sets, 8 RIR (also when week 5 was fully skipped) | CONTRADICTED on load by RP export: RP deload cut weight ~10% (sometimes 50%) and reps |
 | R8 | Soreness: still sore → hold volume; never sore + low pump → +2 sets | Inferred |
 | Weight change | Set's weight edited before logging (no reps typed) → rep target re-derived for equal effort at the week's RIR: Epley on reps-to-failure, `RULES.epley`=30, measured from the originally prescribed weight/target (`pw`/`ptgt` on the set); hint line under the set | Inferred (owner request 2026-09-26); calibrate vs RP |
 | Seeding | Wk 1 from hist; >8 wks stale → −10%; maintenance-priority slots start 1 set, full 2 | Design decision |
@@ -50,6 +50,13 @@ Live: https://schieltz.github.io/ironengine/
 RIR ramp: 3/2/2/1/0 + deload 8. Three training days per week; weekday labels are editable (see Data model).
 
 ## Calibration evidence
+**2026-09-27, RP data export** (13 mesos, Mar 2025 to Aug 2026, ~3,000 sets). Unlike history screenshots it stores RP's prescribed target (weight, reps, weight range) next to what was done, plus per-session, per-muscle soreness/pump/workload and RP's `recommendedSets`. Kept outside the repo (personal data; the repo is public). Replay of week N actuals → RP's week N+1 targets, 803 exercise pairs, 1,057 targeted sets, deload transitions excluded:
+- Current engine: weight right 74.7%, weight + reps right 64.0%, set count right 18%.
+- **Progression mode (not implemented yet):** RP adds load (usually +5 lb, same reps) when the smallest increment is ≤3.8% of the load and the exercise isn't bodyweight-only; otherwise +1 rep. Fits 99.0% of 1,195 targets. With it and without R3's drop trigger: weight right 97.5%, weight + reps 85.7%. Holding set count would match 74.1%.
+- Q1 settled: week 2 Friday incline targets were exactly 2 sets (60×6, 55); no set added after the cut.
+- Week 1 seeding: RP's week-1 targets were not the last top set (higher 56%, same 30%, lower 14%); RP appears to use its own strength estimate.
+- Not calibratable from the export: the weight-change rep rule (RP stores the original target, not the recalculated one).
+
 **Owner's logging habit (confirmed 2026-09-26):** adjusts weights, reps and sets by feel, especially adding early in a meso. So logged history is NOT evidence of what RP prescribed; only skipped sets (which keep RP's prescribed values in RP's day view) and screenshots of RP's targets taken before training count as ground truth.
 
 **2026-09-25, RP "Exercise history" screenshots** (DB Press (High Incline), EZ Bar Curl (Normal Grip)). Leads to test in the calibration meso, NOT proof (see above):
