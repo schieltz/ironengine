@@ -573,7 +573,7 @@ describe('swap an exercise mid-meso (Phase 2)', () => {
     await app.call('await pickWeek(3);');
     const e = app.state().meso.log.w3d3[ROW];
     assert.equal(e.name, PD);
-    assert.deepEqual(e.sets, [target(100, 11), target(100, 10), rirOnly(100, 2)]);
+    assert.deepEqual(e.sets.slice(0, 2), [target(102.5, 10), target(102.5, 9)]);   // cable: +2.5 lb (R9)
   });
 
   test('a swapped-in exercise seeds from earlier sessions of this meso', async () => {

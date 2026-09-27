@@ -543,14 +543,14 @@ function seedState(){
     'Romanian Deadlift':{w:175,date:'2026-07-06'},'Bench Press (Medium Grip)':{w:175,date:'2026-07-06'},
     'Barbell Bent Over Row':{w:120,date:'2026-07-04'},
   };
-  return {v:SCHEMA_VERSION,meso,hist,draft:null,archive:[],custom:[]};
+  return {v:SCHEMA_VERSION,meso,hist,draft:null,archive:[],custom:[],bodyweight:null};
 }
 
 /* ---------- state schema ----------
    Saved state carries v; unversioned saves are v1. To change the stored shape:
    bump SCHEMA_VERSION, append the upgrade step to MIGRATIONS, update seedState(),
    and add a migration test. */
-const SCHEMA_VERSION=7;
+const SCHEMA_VERSION=8;
 const MIGRATIONS=[   /* MIGRATIONS[n-1] upgrades a v(n) state to v(n+1), in place */
   /* v1→v2: feedback moves off the exercise (where it applied to every later week) into
      meso.fb[session][exercise]. A legacy answer is attributed to the latest week of that
@@ -605,6 +605,8 @@ const MIGRATIONS=[   /* MIGRATIONS[n-1] upgrades a v(n) state to v(n+1), in plac
   /* v6→v7: training days get weekday labels you can change: meso.schedule (the plan, per day)
      and meso.dayOf (one session's own label) */
   s=>{ s.meso.schedule=s.meso.schedule||[...DAYS]; s.meso.dayOf=s.meso.dayOf||{}; },
+  /* v7→v8: bodyweight (lb), counted in the load of weighted dips / pull-ups (R9) */
+  s=>{ if(s.bodyweight===undefined) s.bodyweight=null; },
 ];
 function migrate(s){
   let v=s.v||1;
@@ -615,7 +617,7 @@ function migrate(s){
 }
 
 /* ============================ @engine:begin ============================
-   PROGRESSION ENGINE v2 — R1..R8
+   PROGRESSION ENGINE v3 — R1..R9, calibrated against RP (tests/calibration.test.js)
    Pure functions only: no DOM, storage, or app state. tests/harness.js runs
    everything from this banner to the engine:end marker headlessly in node.
    R8 soreness (recovery gate): asked per muscle at next session.
@@ -635,6 +637,8 @@ const RULES={
   staleWeeks:8,        // seeding: history older than this many weeks is discounted
   staleDiscount:0.10,  // seeding: discount on stale history
   epley:30,            // rep/load trade-off: 1RM ≈ weight × (1 + reps/epley)  (inferred; calibrate vs RP)
+  loadModeMax:0.038,   // R9: add load instead of a rep when one jump is at most this share of the load (RP fit 99%)
+  increments:{Cable:2.5,Machine:2.5},   // R9: lb per jump by equipment; everything else uses loadStep
 };
 const pct=x=>Math.round(x*100);
 function rirFor(week){ return week>RIR_RAMP.length ? DELOAD_RIR : RIR_RAMP[week-1]; }
@@ -643,6 +647,13 @@ function rirFor(week){ return week>RIR_RAMP.length ? DELOAD_RIR : RIR_RAMP[week-
 function equivalentReps(w,reps,rir,newW){
   const r=rir||0, e1rm=w*(1+(reps+r)/RULES.epley);
   return Math.max(1,Math.round(RULES.epley*(e1rm/newW-1)-r));
+}
+const incFor=equip=>RULES.increments[equip]||RULES.loadStep;
+/* R9: RP progresses by load when one weight jump is a small enough share of the load, else by reps.
+   Bodyweight-only work always progresses by reps; weighted bodyweight work counts bodyweight in the load. */
+function loadMode(ex,w,bodyweight){
+  if(!w||ex.equip==='Bodyweight Only') return false;
+  return incFor(ex.equip)/(w+(ex.equip==='Bodyweight Loadable'?(bodyweight||0):0))<=RULES.loadModeMax;
 }
 function roundLoad(w){ return Math.max(RULES.minLoad,Math.round(w/RULES.loadStep)*RULES.loadStep); }
 function weeksSince(dateStr){
@@ -662,8 +673,9 @@ function startingSets(name,hist,rir,nSets,opts){
   if(maint) why.push(`Maintenance-priority slot: 1 starting set.`);
   return {sets:mk(w),why:why.join(' ')};
 }
-function prescribe(ex, prevSets, week, feedback){
-  const rir = rirFor(week);
+/* ex: {name, equip}. opts: {bodyweight} (for weighted bodyweight exercises). */
+function prescribe(ex, prevSets, week, feedback, opts){
+  const rir = rirFor(week), o=opts||{}, inc=incFor(ex.equip);
   const why=[];
   const logged=(prevSets||[]).filter(s=>s && s.st==='logged' && s.reps!=null);
   if(!prevSets || logged.length===0){
@@ -684,6 +696,7 @@ function prescribe(ex, prevSets, week, feedback){
   const f=feedback||{};
   const painGate=f.pain>=RULES.painGate, soreGate=f.soreness===3;
   const firstReps=logged[0].reps;
+  let byLoad=0, byReps=0;
   const sets=logged.map((s,i)=>{
     const drop=firstReps-s.reps;
     if(i>0 && (s.reps<=RULES.floorReps || drop>=RULES.dropFromFirst)){
@@ -699,10 +712,13 @@ function prescribe(ex, prevSets, week, feedback){
       why.push(`Set ${i+1}: ${cause} → load cut to <b>${w}</b>, ${rir} RIR (R3).`);
       return {w,tgt:null,rir,st:null,reps:null};
     }
-    return {w:s.w,tgt:painGate?s.reps:s.reps+1,rir:null,st:null,reps:null};
+    if(painGate) return {w:s.w,tgt:s.reps,rir:null,st:null,reps:null};
+    if(loadMode(ex,s.w,o.bodyweight)){ byLoad++; return {w:s.w+inc,tgt:s.reps,rir:null,st:null,reps:null}; }
+    byReps++; return {w:s.w,tgt:s.reps+1,rir:null,st:null,reps:null};
   });
-  if(painGate){ why.push(`Joint pain → rep targets held, no set added (R4).`); return {sets,why:why.join(' ')}; }
-  why.unshift(`Same weight, last week's reps <b>+1</b> (R1).`);
+  if(painGate){ why.push(`Joint pain → weight and rep targets held, no set added (R4).`); return {sets,why:why.join(' ')}; }
+  if(byReps) why.unshift(`Same weight, last week's reps <b>+1</b> (R1).`);
+  if(byLoad) why.unshift(`<b>+${inc} lb</b>, same reps (R9: a ${inc} lb jump is under ${(RULES.loadModeMax*100).toFixed(1)}% of this load, so it progresses by load).`);
   if(soreGate){ why.push(`Still sore from last session → volume held, no set added (R8).`); }
   else if(f.workload===3){ why.push(`'Too much' workload → set count held (R5).`); }
   else{
@@ -834,16 +850,17 @@ function planDay(w,d){ /* returns true when anything changed */
    seeded from history, which includes this meso's earlier sessions. */
 function prescribeEntry(w,d,e){
   const M=ST.meso, slot=M.days[d-1].find(s=>s.id===e.slot);
+  const ex={name:e.name,equip:exInfo(e.name,slot).equip}, opts={bodyweight:ST.bodyweight||0};
   for(let pw=w-1;pw>=1;pw--){
     const pe=(M.log[key(pw,d)]||[]).find(x=>x.slot===e.slot);
     if(!pe||pe.name!==e.name||!pe.sets) continue;
     if(pw===w-1){
-      const p=prescribe(e,pe.sets,w,pe.fb||null);
+      const p=prescribe(ex,pe.sets,w,pe.fb||null,opts);
       if(!pe.sets.some(s=>s.st)) p.why=`Preview: day ${d} of week ${w-1} isn't logged yet, so this repeats its weights `
         +`at <b>${rirFor(w)} RIR</b>${w>RIR_RAMP.length?', half the sets (deload)':''}. Updates automatically once you log it.`;
       return p;
     }
-    const p=prescribe(e,pe.sets.map(s=>({...s,st:'skipped'})),w,null);
+    const p=prescribe(ex,pe.sets.map(s=>({...s,st:'skipped'})),w,null,opts);
     p.why=`Last week this slot did a different exercise (one-off swap). ${p.why}`;
     return p;
   }
@@ -1458,6 +1475,11 @@ function renderEngine(){
   $('main').innerHTML=`
   <div class="eng-block"><h3>R1 · Rep progression</h3>
     <p>Same weight, last week's reps <code>+1</code> per matched set. Verified vs RP exactly.</p></div>
+  <div class="eng-block"><h3>R9 · Load or reps</h3>
+    <p>If one weight jump (${RULES.loadStep} lb; ${RULES.increments.Cable} lb on cables and machines) is at most
+    <code>${(RULES.loadModeMax*100).toFixed(1)}%</code> of the load, the exercise progresses by load: <code>+jump, same reps</code>.
+    Otherwise it progresses by reps (R1). Bodyweight-only exercises always progress by reps; weighted dips and pull-ups
+    count your bodyweight in the load. Matches 99% of RP's choices in your history.</p></div>
   <div class="eng-block"><h3>R2 · Set addition</h3>
     <p>+${RULES.setAdd} set/exercise/week by default; new sets get weight only, worked to the week's RIR. Gated by R4/R5/R8.</p></div>
   <div class="eng-block"><h3>R3 · Load autoregulation</h3>
@@ -1488,12 +1510,20 @@ function renderData(){
     meso${ST.archive.length===1?'':'s'}, draft) in one file. Save it to Files or iCloud. Restoring replaces all current data.</p>
     <div class="card-actions"><button onclick="saveBackup()">Save backup file</button><button onclick="doExport()">Copy JSON</button></div>
     <div class="card-actions"><button onclick="$('importInput').click()">Restore from backup file</button></div></div>
+  <div class="eng-block"><h3>Bodyweight</h3><p>Weighted dips and pull-ups count bodyweight plus added weight when the engine
+    decides between adding load or reps. Log added weight only on those exercises.</p>
+    <input class="form-input" style="margin-top:10px" type="number" inputmode="decimal" id="bwInput" placeholder="Bodyweight (lb)"
+      value="${ST.bodyweight??''}" onchange="setBodyweight(this.value)"></div>
   <div class="eng-block"><h3>Storage</h3><p>${{
     claude:'Saved in Claude artifact storage.',
     local:'Saved in this browser only. On iPhone, the home-screen app and Safari keep separate copies: always use the same one. Back up regularly.',
     memory:'<b style="color:var(--red)">Not being saved.</b> This browser blocks storage; everything is lost when the app closes. Export now.'}[store.mode]}</p></div>
   <div class="eng-block"><h3>Reset</h3><p>Erases everything, including history and the archive, and restores the RP-screenshot seed.</p>
     <div class="card-actions"><button onclick="doReset()" style="color:var(--red)">Reset to seed</button></div></div>`;
+}
+async function setBodyweight(v){
+  const n=parseFloat(v); ST.bodyweight=n>0?n:null;
+  await save(); toast(ST.bodyweight?`Bodyweight ${ST.bodyweight} lb`:'Bodyweight cleared');
 }
 const backupJSON=()=>JSON.stringify(ST,null,1);
 async function saveBackup(){

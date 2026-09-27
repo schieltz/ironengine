@@ -281,3 +281,37 @@ describe('equal-effort rep targets when the load changes (Epley, RIR held)', () 
     assert.equal(E.equivalentReps(100, 3, 0, 200), 1);
   });
 });
+
+describe('R9 load or reps (RP export: fits 99% of 1,195 targets)', () => {
+  const BB = { name: 'Barbell lift', equip: 'Barbell' };
+  test('VERIFIED (RP export): Barbell Squat (High Bar) 170x7 -> 175x7', () => {
+    const p = E.prescribe({ name: 'Barbell Squat (High Bar)', equip: 'Barbell' }, [L(170, 7), L(170, 7)], 3, null);
+    assert.deepEqual(p.sets.slice(0, 2), [target(175, 7), target(175, 7)]);
+    assert.match(p.why, /R9/);
+  });
+  test('VERIFIED (RP export): Standing Calf Raise 90x15 -> 92.5x15 (machine: 2.5 lb jumps)', () => {
+    const p = E.prescribe({ name: 'Standing Calf Raise', equip: 'Machine' }, [L(90, 15), L(90, 15)], 2, null);
+    assert.deepEqual(p.sets.slice(0, 2), [target(92.5, 15), target(92.5, 15)]);
+  });
+  test('VERIFIED (RP export): at 120 the same barbell lifts progress by reps', () => {
+    const p = E.prescribe({ name: 'Barbell Bent Over Row', equip: 'Barbell' }, [L(120, 8), L(120, 8)], 2, null);
+    assert.deepEqual(p.sets.slice(0, 2), [target(120, 9), target(120, 9)]);
+  });
+  test('threshold: 5 lb is 3.7% of 135 (adds load) but 3.85% of 130 (adds a rep)', () => {
+    assert.deepEqual(E.prescribe(BB, [L(135, 8)], 3, null).sets[0], target(140, 8));
+    assert.deepEqual(E.prescribe(BB, [L(130, 8)], 3, null).sets[0], target(130, 9));
+  });
+  test('weighted dips count bodyweight: 40 added at 165 bodyweight adds load', () => {
+    const DIP = { name: 'Dip (Weighted, Triceps-Focused)', equip: 'Bodyweight Loadable' };
+    assert.deepEqual(E.prescribe(DIP, [L(40, 10)], 3, null, { bodyweight: 165 }).sets[0], target(45, 10));
+    assert.deepEqual(E.prescribe(DIP, [L(40, 10)], 3, null).sets[0], target(40, 11));   // bodyweight unknown
+  });
+  test('bodyweight-only exercises always progress by reps', () => {
+    const PU = { name: 'Pullup (Normal Grip)', equip: 'Bodyweight Only' };
+    assert.deepEqual(E.prescribe(PU, [L(null, 8)], 3, null).sets[0], target(null, 9));
+  });
+  test('moderate joint pain holds weight and reps even where load would progress', () => {
+    const p = E.prescribe(BB, [L(200, 8)], 3, { soreness: 2, pain: 2, pump: 1, workload: 1 });
+    assert.deepEqual(p.sets, [target(200, 8)]);
+  });
+});

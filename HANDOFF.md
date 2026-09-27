@@ -27,6 +27,7 @@ Live: https://schieltz.github.io/ironengine/
 - `prescribeEntry()` progresses an entry from the most recent earlier session of the same slot that did the same exercise: last week → R1-R8 with that session's feedback; older (slot did something else in between) → missed week, R6; none → seeded via `startingSets()` from `effectiveHist()` (history plus this meso's earlier sessions), keeping the slot's last set count.
 - `ST.hist`: exercise name → {w: last top-set weight, date} — cross-meso, permanent. Harvested on Activate by `harvestHistory()`: heaviest logged set in the exercise's most recent session (schedule order), dated with that session's date. It can go down. `date: null` = unknown (never treated as stale).
 - `ST.meso.dates`: session → local date its first set was logged (v4). Undated legacy sessions borrow the meso's latest known date at harvest.
+- `ST.bodyweight`: lb or null (v8); added to the load of weighted dips/pull-ups for R9. Log added weight only on those.
 - `ST.draft`: meso under construction in Builder
 - `ST.archive`: finished mesos, kept whole (every set) with `archivedAt` when a draft is activated (v3). No browsing UI yet; included in backups.
 - `CATALOG`: 213 built-in exercises, each {name, mg, equip, last, home}: 98 from the owner's RP history (with last-performed dates) plus 115 he approved in the 2026-09-26 library review (`last: null`; decisions pinned in `tests/fixtures/library-review-2026-09-26.json`). 12 muscle groups (`MGS`), including TRAPS and ABS from that review.
@@ -37,6 +38,7 @@ Live: https://schieltz.github.io/ironengine/
 | Rule | Behavior | Validation |
 |------|----------|------------|
 | R1 | Same weight, prior week reps +1 per set | VERIFIED vs RP exactly; RP export: 92% of 858 same-weight targets |
+| R9 | Load or reps: +1 jump (5 lb; 2.5 lb cable/machine, `RULES.increments`), same reps, when the jump is ≤3.8% of the load (`RULES.loadModeMax`); otherwise R1 (+1 rep). Bodyweight-only → always reps; weighted bodyweight → load includes `ST.bodyweight` (v8, Data tab) | VERIFIED by RP export: fits 99% of 1,195 targets; examples pinned as fixtures |
 | R2 | +1 set/exercise/week; new sets get weight + RIR target only | CONTRADICTED by RP export: RP held set count 74% of the time; adds are per muscle group and feedback-driven. Current rule matches RP's next-week set count 18% |
 | R3 | Later sets ≤4 reps or ≥3 below set 1 → ~8% load cut, RIR reset. Load is held (never raised) when rounding cancels the cut or the set is bodyweight; the "why" names the trigger | VERIFIED (60×4 → 55 exact match). The 8% is inferred: 60→55 fits any 4.2-12.5% cut. Set count after the cut (2 vs 3) unconfirmed. Floor trigger (≤4 reps) verified, the only case in 18 months. The ≥3-below-set-1 trigger is CONTRADICTED by RP export: 82 of 82 cases RP held or raised the load |
 | R4 | Joint pain ≥ moderate → hold reps, no set add | Inferred |
