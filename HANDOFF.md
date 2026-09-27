@@ -92,6 +92,7 @@ Run `npm test` (Node 20+, zero dependencies). Every engine change must pass it b
 - `tests/app.test.js`: VERIFIED fixtures again through the real `ensureDay()` path on the seed (w1d3 → w2d3); storage adapter guard (window.storage present → localStorage never touched; absent → `ironengine:` prefix, reload restores).
 - Open `todo` test: DB incline set count. HANDOFF lists 2 sets; engine emits 3 (R2 adds a set after the R3 cut). Resolve with the RP screenshot, then make it a hard assertion.
 - New RP-verified behavior from calibration becomes a permanent fixture in the VERIFIED block.
+- `tests/calibration.test.js`: replays 721 anonymized cases from the owner's RP export (`tests/fixtures/rp-calibration.json`, built by `node tools/rp-calibration.js <export.json>`; weights, reps and feedback only, bodyweight-only weights blanked) through the engine and reports agreement with RP's actual next-week prescriptions. `FLOORS` hold the agreement the current rules reach; a rule change must not drop below them, and raises them when it improves agreement.
 
 ## Deployment
 GitHub Pages from `main`, repo root (`.nojekyll`, no build). Repo: https://github.com/schieltz/ironengine. Flow: `npm test` green → commit (conventional, one logical change) → `git push`. Pages rebuilds in about a minute. Note: `tests/`, `package.json` and this file are also publicly served; harmless.
