@@ -16,8 +16,8 @@ const FIXTURE = path.join(__dirname, 'fixtures', 'rp-calibration.json');
 const E = loadEngine({ now: Date.parse('2026-09-27T12:00:00Z') });
 
 const FLOORS = {
-  weight: 0.89,        // share of RP-targeted sets where the engine's weight matches RP's
-  weightAndReps: 0.73, // ... where weight and rep target both match
+  weight: 0.93,        // share of RP-targeted sets where the engine's weight matches RP's
+  weightAndReps: 0.79, // ... where weight and rep target both match
   setCount: 0.19,      // share of exercises where next week's set count matches RP's
   deloadWeight: 0.00,  // deload: first set's weight matches RP's
   deloadSets: 0.15,    // deload: set count matches RP's

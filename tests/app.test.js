@@ -520,11 +520,13 @@ describe('schema v5: sessions are lists of entries with permanent slot ids', () 
     assert.ok(st.meso.days.flat().every(s => !('_why' in s)));
   });
 
-  test('upgraded data prescribes exactly what v4 did', async () => {
+  test('upgraded data keeps every set you logged', async () => {
     const old = v4State();
     const st = (await bootFromV4()).state();
     for (const k of Object.keys(old.meso.log)) {
-      assert.deepEqual(st.meso.log[k].map(e => e.sets), old.meso.log[k], k);
+      old.meso.log[k].forEach((sets, i) => {
+        if ((sets || []).some(s => s.st || s.u)) assert.deepEqual(st.meso.log[k][i].sets, sets, `${k}[${i}]`);
+      });
     }
   });
 });

@@ -630,7 +630,6 @@ const RULES={
   minLoad:5,           // lb; floor for any rounded load
   cutPct:0.08,         // R3 load cut (60→55 verified; the 8% itself is inferred)
   floorReps:4,         // R3: a later set at or below this many reps triggers the cut
-  dropFromFirst:3,     // R3: a later set this many reps below set 1 triggers the cut
   painGate:2,          // R4: pain answer at or above this (2 = moderate) holds reps and sets
   setAdd:1,            // R2: sets added per exercise per week
   strongSetAdd:2,      // R5/R8: sets added on an under-stimulated signal
@@ -695,13 +694,12 @@ function prescribe(ex, prevSets, week, feedback, opts){
   }
   const f=feedback||{};
   const painGate=f.pain>=RULES.painGate, soreGate=f.soreness===3;
-  const firstReps=logged[0].reps;
   let byLoad=0, byReps=0;
   const sets=logged.map((s,i)=>{
-    const drop=firstReps-s.reps;
-    if(i>0 && (s.reps<=RULES.floorReps || drop>=RULES.dropFromFirst)){
-      const cause=s.reps<=RULES.floorReps ? `${s.reps} reps last week (at or below the ${RULES.floorReps}-rep floor)`
-        : `${s.reps} reps last week, ${drop} fewer than set 1`;
+    /* R3 fires only on the rep floor. A later set well below set 1 but above the floor is normal fatigue:
+       RP kept or raised the load in all 82 such cases in the owner's history. */
+    if(i>0 && s.reps<=RULES.floorReps){
+      const cause=`${s.reps} reps last week (at or below the ${RULES.floorReps}-rep floor)`;
       const w=s.w ? roundLoad(s.w*(1-RULES.cutPct)) : s.w;
       /* never raise a load or claim a cut that rounding cancelled; bodyweight has nothing to cut */
       if(!s.w || w>=s.w){
@@ -1483,7 +1481,8 @@ function renderEngine(){
   <div class="eng-block"><h3>R2 · Set addition</h3>
     <p>+${RULES.setAdd} set/exercise/week by default; new sets get weight only, worked to the week's RIR. Gated by R4/R5/R8.</p></div>
   <div class="eng-block"><h3>R3 · Load autoregulation</h3>
-    <p>Later sets at <code>≤${RULES.floorReps} reps</code> or <code>≥${RULES.dropFromFirst}</code> below set 1 → <code>~${pct(RULES.cutPct)}%</code> load cut, RIR reset. Verified: 60×4 → RP prescribed 55. Exact match.</p></div>
+    <p>A later set at <code>≤${RULES.floorReps} reps</code> → <code>~${pct(RULES.cutPct)}%</code> load cut, RIR reset. Verified: 60×4 → RP prescribed 55.
+    Sets that just fade from set 1 (above the floor) progress normally: RP never cut those in your history.</p></div>
   <div class="eng-block"><h3>R4 · Pain gate</h3>
     <p>Moderate+ joint pain → rep targets held, no set added.</p></div>
   <div class="eng-block"><h3>R5 · Workload feedback</h3>
