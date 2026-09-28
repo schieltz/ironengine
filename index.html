@@ -1913,6 +1913,11 @@ async function doReset(){
   await ensureDay(selWeek,selDay); await save(); view='workout'; render(); toast('Reset');
 }
 init();
+/* Offline support for self-hosted installs (sw.js next to this file): the app still opens with no
+   signal. Skipped inside Claude (window.storage) and wherever service workers aren't available. */
+if(!window.storage&&'serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
 </script>
 </body>
 </html>

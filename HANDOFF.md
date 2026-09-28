@@ -15,6 +15,7 @@ Live: https://schieltz.github.io/ironengine/
    - PRs (`prIndex()`): a logged set is a PR when its estimated 1RM (weighted bodyweight incl. bodyweight; bodyweight-only: reps) beats every earlier session of the exercise; only the session's best set is tagged, a toast announces it, and history tags each session that set a new best. `sessionsOf()` results are cached per render and cleared on every save.
    - Weekly sets per muscle (`weekVolume()`, `openVolume()`, button at the top of each workout): per muscle group, sets done (logged) out of planned (not skipped) across the week's sessions, a same-ramp meter, and last week's done count; plans the whole week first so days not yet opened count.
    - Backup reminder (`backupDue()`, `renderNudge()`, v9): on the Workout view, once any set is logged or history is imported, a bar asks for a backup when the last one (`lastBackupAt`, set by Save backup file or Copy JSON) is 7+ days old or missing; "Later" snoozes it until tomorrow. Hidden in memory-only mode (the red banner covers that).
+   - Offline (`sw.js`, registered at the end of the script only on https/localhost and never when `window.storage` exists): network first so updates arrive with signal; after a failure or 3 s it serves the saved copy of `index.html`. Caches the app page only, never training data. Bump `CACHE` in sw.js only if the caching scheme changes.
    - Workout card actions: − (remove last set; logged ones after a confirm; one set minimum; marks the entry touched), + Set, Feedback, ⋯ (swap, skip remaining sets, note, move, remove).
    - Notes belong to the plan slot (shown every week the slot does that exercise); set from the exercise menu, rendered escaped.
    - "+ New exercise" (Library and picker) creates a custom exercise; from the picker it continues straight into the swap/add.
@@ -90,7 +91,6 @@ RIR ramp: 3/2/2/1/0 + deload 8. Three training days per week; weekday labels are
 - No multi-meso archive browsing UI (full mesos are kept in `ST.archive` and in backups)
 - Casey Kelly template: 4 pinned exercises substituted with home equivalents (owner-approved to revisit)
 - Backup = file (iOS share sheet → Files/iCloud; download elsewhere) or clipboard JSON; restore from file on the Data tab or the load-error sheet. Reset, Activate, Discard, Restore and Start fresh all confirm first
-- No service worker yet (offline works via browser cache once loaded; make explicit)
 
 ## Testing protocol (established, keep it)
 Run `npm test` (Node 20+, zero dependencies). Every engine change must pass it before commit.
@@ -105,7 +105,7 @@ Run `npm test` (Node 20+, zero dependencies). Every engine change must pass it b
 GitHub Pages from `main`, repo root (`.nojekyll`, no build). Repo: https://github.com/schieltz/ironengine. Flow: `npm test` green → commit (conventional, one logical change) → `git push`. Pages rebuilds in about a minute. Note: `tests/`, `package.json` and this file are also publicly served; harmless.
 
 ## Hard constraints
-- Single self-contained HTML file. No build step, no CDN dependencies, no framework.
+- Single self-contained HTML file. No build step, no CDN dependencies, no framework. One approved exception (2026-09-28): `sw.js`, a ~40-line service worker beside it for offline launch; the app itself stays one file and runs without it.
 - Never break the three VERIFIED rules without new ground-truth screenshots proving RP behaves differently.
 - localStorage path must remain guarded (only executes when window.storage is absent).
 - Mobile-first: 44px+ touch targets, numeric inputmode, thumb-reachable actions.
