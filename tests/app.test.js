@@ -448,7 +448,7 @@ describe('cross-meso history = last top set, real dates (S1)', () => {
     // close-grip bench: Wed w2 logged 120x12,11; Fri w2 logged here at 115
     await app.call(`for (const j of [0,1]) { await upd(3,j,"w","115"); await tapLog(3,j); }`);
     await activate(app);
-    assert.deepEqual(app.state().hist['Bench Press (Close Grip)'], { w: 115, date: '2026-07-19' });
+    assert.deepEqual(app.state().hist['Bench Press (Close Grip)'], { w: 115, date: '2026-09-25' });   // logged today
   });
 
   test('undated sessions borrow the meso\'s latest known date, else null', async () => {
@@ -1039,5 +1039,88 @@ describe('import RP history (#2)', () => {
     assert.deepEqual(fresh.state(), before);
     await importIt(fresh, '{"not":"rp"}');
     assert.deepEqual(fresh.state(), before);
+  });
+});
+
+describe('exercise history', () => {
+  const SAMPLE = require('node:fs').readFileSync(require('node:path').join(__dirname, 'fixtures', 'rp-export-sample.json'), 'utf8');
+  const withImport = async () => {
+    const app = await bootApp({ now: NOW, confirm: () => true });
+    await app.call(`await importRPText(${JSON.stringify(SAMPLE)});`);
+    return app;
+  };
+  const sessions = (app, name) => Array.from(app.run(`sessionsOf(${JSON.stringify(name)}).map(s => [s.meso, s.k, s.date, s.deload])`), x => Array.from(x));
+
+  test('sessions come from the archive and the current meso, in date order', async () => {
+    const app = await withImport();
+    assert.deepEqual(sessions(app, 'Dip (Weighted, Triceps-Focused)'), [
+      ['New meso plan', 'w2d1', null, false],                   // undated seed session sorts with its meso's first date (Jul)
+      ['Sample meso B', 'w1d1', '2026-08-01', false],
+      ['Sample meso B', 'w2d1', '2026-08-08', true],            // RP's last week is its deload
+    ]);
+  });
+
+  test('each workout card shows the latest earlier session, and tapping opens the history', async () => {
+    const app = await bootApp({ now: NOW });
+    const main = app.els.get('main').innerHTML;
+    assert.match(main, /Last: <b>120 × 12, 11<\/b>/);          // close-grip bench, Wed week 2
+    assert.match(main, /onclick="openHistory\('Bench Press \(Close Grip\)'\)"/);
+  });
+
+  test('history screen: summary tiles, trend readout, sessions grouped by meso, newest first', async () => {
+    const app = await withImport();
+    await app.call(`openHistory('Dip (Weighted, Triceps-Focused)');`);
+    const html = app.els.get('modalRoot').innerHTML;
+    assert.match(html, /Best set<\/div><div class="kpi-v">65 × 8/);
+    assert.match(html, /Est\. 1RM<\/div><div class="kpi-v">293</);  // (65 + 166 bodyweight) x (1 + 8/30) = 292.6
+    assert.match(html, /incl\. bodyweight/);
+    assert.ok(html.indexOf('Sample meso B') < html.indexOf('New meso plan'), 'newest meso first');
+    assert.match(html, /65 lb × 8<span class="tag-dl">DELOAD<\/span>/);
+    assert.match(html, /Week 1 · Day 1<br>Sat Aug 1, 2026/);
+    assert.match(app.els.get('sparkRead').innerHTML, /Aug 1, 2026 · <b>60 × 8<\/b>/);   // latest non-deload session
+  });
+
+  test('bodyweight-only sets read "BW"; no history shows a friendly empty state', async () => {
+    const app = await withImport();
+    await app.call(`openHistory('Pullup (Normal Grip)');`);
+    assert.match(app.els.get('modalRoot').innerHTML, /BW × 9/);
+    assert.match(app.els.get('modalRoot').innerHTML, /Best reps/);
+    await app.call(`openHistory('Sissy Squat');`);
+    assert.match(app.els.get('modalRoot').innerHTML, /No logged sessions yet/);
+  });
+
+  test('Library taps open history; your own exercises can be deleted from there', async () => {
+    const app = await withImport();
+    await app.call("setView('library'); libHome=false; libQ='mystery'; renderLibrary();");
+    assert.match(app.els.get('libList').innerHTML, /onclick="openHistory\('Mystery Machine Row'\)"/);
+    await app.call(`openHistory('Mystery Machine Row');`);
+    assert.match(app.els.get('modalRoot').innerHTML, /deleteCustom\('Mystery Machine Row'\)/);
+  });
+});
+
+describe('each exercise keeps its own date', () => {
+  test('RP sessions spanning days: every exercise is dated by its own first set', async () => {
+    const sample = JSON.parse(require('node:fs').readFileSync(require('node:path').join(__dirname, 'fixtures', 'rp-export-sample.json'), 'utf8'));
+    sample[0].weeks[0].days[0].exercises[1].sets[0].finishedAt = '2026-08-02T09:00:00.000Z';   // row done the next day
+    const app = await bootApp({ now: NOW, confirm: () => true });
+    await app.call(`await importRPText(${JSON.stringify(JSON.stringify(sample))});`);
+    const b = app.state().archive.find(m => m.rpId === 222);
+    assert.deepEqual([b.log.w1d1[0].date, b.log.w1d1[1].date, b.dates.w1d1], ['2026-08-01', '2026-08-02', '2026-08-01']);
+    assert.equal(app.state().hist['Mystery Machine Row'].date, '2026-08-02');
+  });
+
+  test('logging in the app stamps the exercise the day its first set is logged', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('await pickWeek(3); await upd(0,0,"reps","9"); await tapLog(0,0);');
+    assert.equal(app.state().meso.log.w3d3[0].date, '2026-09-25');
+  });
+});
+
+describe('history estimates for weighted bodyweight work', () => {
+  test('a weighted-dip session at bodyweight only still counts bodyweight as the load', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('await setBodyweight("165");');
+    assert.equal(Math.round(app.run('bestOf([{w:null,reps:12}],165).v')), 231);   // 165 x (1 + 12/30)
+    assert.equal(app.run('bestOf([{w:null,reps:12}],0).v'), 12);                   // bodyweight-only: reps
   });
 });
