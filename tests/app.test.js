@@ -820,14 +820,29 @@ describe('rep targets follow weight changes (#4)', () => {
     assert.equal(app.els.get('h-3-0').innerHTML, '');
   });
 
-  test('reps you typed yourself, logged sets, and RIR-only sets are left alone', async () => {
+  test('reps you typed yourself, logged sets, and RIR-only sets keep their reps', async () => {
     const app = await bootApp({ now: NOW });
-    await app.call('await upd(3,0,"reps","12"); await upd(3,0,"w","130");');
+    await app.call('await tapLog(3,1); await upd(3,0,"reps","12"); await upd(3,0,"w","130");');
     assert.deepEqual([s0(app).reps, s0(app).tgt], [12, 11]);
-    await app.call('await tapLog(3,1); await upd(3,1,"w","130");');
-    assert.equal(app.state().meso.log.w2d3[3].sets[1].reps, 10);
-    await app.call('await upd(3,2,"w","130");');                  // new set: RIR target only
-    assert.equal(app.state().meso.log.w2d3[3].sets[2].tgt, null);
+    const sets = app.state().meso.log.w2d3[3].sets;
+    assert.deepEqual([sets[1].w, sets[1].reps], [120, 10]);              // logged: untouched
+    assert.deepEqual([sets[2].w, sets[2].tgt], [130, null]);             // RIR-only: weight follows, no rep target
+  });
+
+  test('a weight change carries to later sets still at the old weight', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('await upd(3,0,"w","130");');
+    assert.deepEqual(app.state().meso.log.w2d3[3].sets.map(s => [s.w, s.tgt]), [[130, 8], [130, 7], [130, null]]);
+    assert.equal(app.els.get('w-3-1').value, 130);
+    assert.equal(app.els.get('r-3-1').value, 7);
+    await app.call('await upd(3,1,"w","125");');                         // a later edit only moves sets after it
+    assert.deepEqual(app.state().meso.log.w2d3[3].sets.map(s => s.w), [130, 125, 125]);
+  });
+
+  test('earlier sets and sets at a different weight (a load cut) do not follow', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('await upd(4,0,"w","65");');                          // incline: 60x6, then 55 (cut)
+    assert.deepEqual(app.state().meso.log.w2d3[4].sets.map(s => s.w), [65, 55]);
   });
 
   test('next week progresses from what you actually did at the new weight', async () => {

@@ -1044,15 +1044,25 @@ function retarget(s,oldW){
 }
 const setHint=s=>(!s.st&&s.pw!=null&&s.w&&s.w!==s.pw&&s.tgt!=null)
   ?`↳ ${s.w} instead of ${s.pw}: ${s.tgt} reps instead of ${s.ptgt}, same effort at ${s.rir??rirFor(selWeek)} RIR`:'';
+/* A weight change carries forward: later sets still at the old weight, not logged and with no reps
+   typed, take the new weight too (with rep targets recalculated). */
 async function upd(ei,si,f,v){
-  const s=entryAt(ei).sets[si], oldW=s.w;
+  const sets=entryAt(ei).sets, s=sets[si], oldW=s.w, moved=[si];
   s[f]=v===''?null:parseFloat(v); s.u=1;   /* u: user-touched, freezes this exercise's prescription */
-  if(f==='w') retarget(s,oldW);
-  await save();
-  if(f==='w'){   /* update in place: a full re-render would steal focus from the next input */
-    if(s.reps==null&&!s.st) $(`r-${ei}-${si}`).value=s.tgt??'';
-    $(`h-${ei}-${si}`).innerHTML=setHint(s);
+  if(f==='w'){
+    retarget(s,oldW);
+    if(s.w!=null&&oldW!=null) for(let j=si+1;j<sets.length;j++){
+      const x=sets[j];
+      if(!x.st&&x.reps==null&&x.w===oldW){ x.w=s.w; x.u=1; retarget(x,oldW); moved.push(j); }
+    }
   }
+  await save();
+  if(f==='w') moved.forEach(j=>{   /* update in place: a full re-render would steal focus from the next input */
+    const x=sets[j];
+    if(j!==si) $(`w-${ei}-${j}`).value=x.w??'';
+    if(x.reps==null&&!x.st) $(`r-${ei}-${j}`).value=x.tgt??'';
+    $(`h-${ei}-${j}`).innerHTML=setHint(x);
+  });
 }
 /* Log button: open set → logged (empty reps take the target); logged or skipped → open again,
    reps kept. An open set with no reps and no target needs a second tap to skip. */

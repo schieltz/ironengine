@@ -49,7 +49,7 @@ Live: https://schieltz.github.io/ironengine/
 | R6 | All sets skipped → re-prescribe same weights, RIR only | VERIFIED; RP export: same weights 85%, extra set only 7% (Q2 settled: no add) |
 | R7 | Deload week: `RULES.deloadSets` (2) sets per exercise; load ~90% of last week in the first half of the week, ~50% in the second half (`deloadLoad`, uses `opts.day/days`); rep targets ~60% of last week's (`deloadReps`). Unlogged week 5 → planned weights lightened, 8 RIR | Calibrated on RP export: deload weight agreement 1% → 69%, sets 40% → 65%. Consistent with the logged 60 → 30×5,5 day-3 deload |
 | R8 | Soreness: still sore → hold volume; never sore + low pump → +1 set | Inferred; RP adds mostly after 'never sore' |
-| Weight change | Set's weight edited before logging (no reps typed) → rep target re-derived for equal effort at the week's RIR: Epley on reps-to-failure, `RULES.epley`=30, measured from the originally prescribed weight/target (`pw`/`ptgt` on the set); hint line under the set | Inferred (owner request 2026-09-26); calibrate vs RP |
+| Weight change | Set's weight edited before logging (no reps typed) → rep target re-derived for equal effort at the week's RIR: Epley on reps-to-failure, `RULES.epley`=30, measured from the originally prescribed weight/target (`pw`/`ptgt` on the set); hint line under the set. The change carries to later sets still at the old weight (not logged, no reps typed) | Inferred (owner request 2026-09-26); calibrate vs RP |
 | Seeding | Wk 1 from hist; >8 wks stale → −10%; maintenance-priority slots start 1 set, full 2 | Design decision |
 
 RIR ramp: 3/2/2/1/0 + deload 8. Three training days per week; weekday labels are editable (see Data model).
