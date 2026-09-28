@@ -1190,7 +1190,7 @@ describe('weekly sets per muscle', () => {
 
 describe('backup reminder', () => {
   const DAY = 86400000;
-  const nudge = app => app.els.get('nudge').innerHTML;
+  const nudge = app => { const m = /<div class="nudge">[\s\S]*?<\/div>/.exec(app.els.get('main').innerHTML); return m ? m[0] : ''; };
 
   test('asks for a first backup once there is training data; backing up clears it', async () => {
     const ls = fakeLocalStorage();

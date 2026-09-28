@@ -128,9 +128,10 @@ nav button.active{color:var(--blue)}
 .eng-block h3{font-size:15px;font-weight:800;color:var(--blue);letter-spacing:.3px;margin-bottom:6px}
 .eng-block p{font-size:13.5px;color:var(--ink-dim);line-height:1.55}
 .eng-block code{background:var(--panel2);padding:1px 6px;border-radius:5px;font-size:12.5px;color:var(--ink)}
-.nudge{display:flex;align-items:center;gap:8px;margin-top:8px;background:#2B2617;color:#D9C27A;border-radius:9px;
-  padding:6px 6px 6px 12px;font-size:12.5px;font-weight:600;line-height:1.3}
-.nudge span{flex:1}
+.nudge{display:flex;align-items:center;gap:8px;margin:6px 0 2px;background:#2B2617;color:#D9C27A;border-radius:11px;
+  padding:6px 6px 6px 12px;font-size:13px;font-weight:800;line-height:1.25}
+.nudge span{flex:1;min-width:0}
+.nudge small{display:block;font-size:11.5px;font-weight:600;opacity:.85}
 .nudge button{min-height:44px;padding:0 12px;border-radius:8px;font-weight:800;font-size:12.5px;color:#D9C27A;
   border:1px solid rgba(217,194,122,.35)}
 .banner{margin-top:8px;background:#3A1C18;border:1px solid var(--red);color:#F0B8B0;font-size:13px;font-weight:600;
@@ -200,7 +201,6 @@ nav button.active{color:var(--blue)}
   <div class="h-title" id="hTitle"></div>
   <div class="h-sub" id="hSub"></div>
   <div id="banner"></div>
-  <div id="nudge"></div>
 </header>
 <div class="spine" id="spine"></div>
 <div class="daytabs" id="daytabs"></div>
@@ -944,7 +944,7 @@ const entryAt=ei=>ST.meso.log[key(selWeek,selDay)][ei];
 
 function render(){
   sessCache=new Map();
-  renderHeader(); renderBanner(); renderNudge(); renderSpine(); renderTabs();
+  renderHeader(); renderBanner(); renderSpine(); renderTabs();
   ({workout:renderWorkout,library:renderLibrary,builder:renderBuilder,engine:renderEngine,data:renderData})[view]();
   ['navW','navL','navB','navE','navD'].forEach(id=>$(id).classList.remove('active'));
   $({workout:'navW',library:'navL',builder:'navB',engine:'navE',data:'navD'}[view]).classList.add('active');
@@ -1015,7 +1015,7 @@ function setView(v){ view=v; render(); }
 /* ---------- workout ---------- */
 function renderWorkout(){
   const k=key(selWeek,selDay), log=ST.meso.log[k];
-  let html=`<button class="vol-link" onclick="openVolume()">Week ${selWeek} · sets per muscle ›</button>`, lastMg='';
+  let html=nudgeHtml()+`<button class="vol-link" onclick="openVolume()">Week ${selWeek} · sets per muscle ›</button>`, lastMg='';
   log.forEach((e,i)=>{
     const slot=slotOf(selDay,e), ex=exInfo(e.name,slot), sets=e.sets||[], own=slot&&slot.name===e.name;
     if(ex.mg!==lastMg){ html+=`<span class="mg-tag" style="background:var(--mg-${ex.mg})">${ex.mg}</span>`; lastMg=ex.mg; }
@@ -1779,11 +1779,11 @@ function backupDue(){
   const logged=ST.archive.length>0||Object.values(ST.meso.log).some(es=>es.some(e=>(e.sets||[]).some(s=>s.st==='logged')));
   return logged&&(!ST.lastBackupAt||daysBetween(ST.lastBackupAt,today)>=BACKUP_EVERY);
 }
-function renderNudge(){
-  const el=$('nudge');
-  if(view!=='workout'||!backupDue()){ el.innerHTML=''; return; }
+/* shown at the top of the workout list (it scrolls away rather than riding in the sticky header) */
+function nudgeHtml(){
+  if(!backupDue()) return '';
   const n=ST.lastBackupAt?daysBetween(ST.lastBackupAt,localDate()):null;
-  el.innerHTML=`<div class="nudge"><span>${n==null?'No backup yet':`Last backup ${n} days ago`}. Your training data lives only on this phone.</span>
+  return `<div class="nudge"><span>${n==null?'No backup yet':`Last backup ${n} days ago`}<small>Your data lives only on this phone</small></span>
     <button onclick="saveBackup()">Back up</button><button onclick="snoozeBackup()">Later</button></div>`;
 }
 async function markBackedUp(){ ST.lastBackupAt=localDate(); ST.backupSnooze=null; await save(); render(); }
