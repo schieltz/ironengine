@@ -1164,3 +1164,26 @@ describe('PR badges', () => {
     assert.match(html, /60 lb × 8<span class="tag-pr">PR<\/span>/);
   });
 });
+
+describe('weekly sets per muscle', () => {
+  const rowFor = (html, label) => { const i = html.indexOf(`<span class="vol-name">${label}</span>`); return i < 0 ? '' : html.slice(i, html.indexOf('</div>', i)); };
+
+  test('done out of planned per muscle, next to last week, with a total', async () => {
+    const app = await bootApp({ now: NOW });
+    assert.match(app.els.get('main').innerHTML, /onclick="openVolume\(\)">Week 2 · sets per muscle/);
+    await app.call('await openVolume();');
+    const html = app.els.get('modalRoot').innerHTML;
+    assert.match(rowFor(html, 'Triceps'), /6 \/ 9<small>last week 2<\/small>/);   // Fri bench still to do
+    assert.match(rowFor(html, 'Biceps'), /13 \/ 13<small>last week 0<\/small>/);
+    assert.match(rowFor(html, 'Chest'), /0 \/ 2<small>last week 2<\/small>/);     // Mon bench was skipped
+    assert.equal(rowFor(html, 'Glutes'), '');                                      // only skipped sets: not shown
+    assert.match(rowFor(html, 'Total'), /\d+ \/ \d+/);
+  });
+
+  test('planning the week fills in days not opened yet', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('await pickWeek(3); await openVolume();');
+    assert.ok(app.state().meso.log.w3d1 && app.state().meso.log.w3d2, 'all days of week 3 planned');
+    assert.match(rowFor(app.els.get('modalRoot').innerHTML, 'Biceps'), /0 \/ \d+<small>last week 13<\/small>/);
+  });
+});

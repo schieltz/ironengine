@@ -50,6 +50,16 @@ main{padding:6px 12px}
 .last-line{display:block;width:100%;min-height:32px;margin-top:6px;padding:6px 10px;border-radius:8px;background:var(--panel2);
   font-size:12.5px;color:var(--ink-dim);font-variant-numeric:tabular-nums;text-align:left}
 .last-line b{color:var(--ink);font-weight:700}
+.vol-link{display:block;width:100%;min-height:44px;margin:6px 0 2px;padding:10px 14px;border-radius:11px;background:var(--panel);
+  border:1px solid var(--line);font-size:13px;font-weight:700;color:var(--ink-dim);text-align:left}
+.vol-row{display:grid;grid-template-columns:10px minmax(70px,1fr) minmax(60px,1.4fr) auto;gap:10px;align-items:center;
+  padding:11px 0;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
+.vol-row .dot{width:10px;height:10px;border-radius:50%}
+.vol-name{font-weight:700;font-size:14px}
+.vol-meter{height:8px;border-radius:4px;background:var(--blue-dim);overflow:hidden}
+.vol-meter span{display:block;height:100%;border-radius:4px;background:var(--blue)}
+.vol-num{font-size:14px;font-weight:700;text-align:right;white-space:nowrap}
+.vol-num small{display:block;font-size:11.5px;font-weight:600;color:var(--ink-dim)}
 .kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:14px}
 .kpi{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px}
 .kpi-l{font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--ink-faint)}
@@ -997,7 +1007,7 @@ function setView(v){ view=v; render(); }
 /* ---------- workout ---------- */
 function renderWorkout(){
   const k=key(selWeek,selDay), log=ST.meso.log[k];
-  let html='', lastMg='';
+  let html=`<button class="vol-link" onclick="openVolume()">Week ${selWeek} · sets per muscle ›</button>`, lastMg='';
   log.forEach((e,i)=>{
     const slot=slotOf(selDay,e), ex=exInfo(e.name,slot), sets=e.sets||[], own=slot&&slot.name===e.name;
     if(ex.mg!==lastMg){ html+=`<span class="mg-tag" style="background:var(--mg-${ex.mg})">${ex.mg}</span>`; lastMg=ex.mg; }
@@ -1109,6 +1119,39 @@ async function addSet(ei){
   const lastW=sets.length?sets[sets.length-1].w:null;
   sets.push({w:lastW,tgt:null,rir:rirFor(selWeek),st:null,reps:null,u:1});
   await save(); render();
+}
+
+/* ---------- weekly sets per muscle ----------
+   Sets per muscle group across the week's sessions: done (logged) out of planned (everything not skipped),
+   next to what was done the week before. */
+function weekVolume(w){
+  const out={};
+  for(let d=1;d<=DAYS.length;d++) (ST.meso.log[key(w,d)]||[]).forEach(e=>{
+    const mg=exInfo(e.name,slotOf(d,e)).mg, o=out[mg]||(out[mg]={planned:0,done:0});
+    (e.sets||[]).forEach(s=>{ if(s.st!=='skipped') o.planned++; if(s.st==='logged') o.done++; });
+  });
+  return out;
+}
+async function openVolume(){
+  let changed=false;
+  for(let d=1;d<=DAYS.length;d++) if(planDay(selWeek,d)) changed=true;   /* plan the whole week first */
+  if(changed) await save();
+  const cur=weekVolume(selWeek), prev=selWeek>1?weekVolume(selWeek-1):{}, none={planned:0,done:0};
+  const rows=MGS.map(mg=>({mg,c:cur[mg]||none,p:prev[mg]||none})).filter(r=>r.c.planned||r.c.done||r.p.done);
+  const sum=f=>rows.reduce((n,r)=>n+f(r),0);
+  const row=(dot,name,c,p)=>`<div class="vol-row">${dot}<span class="vol-name">${name}</span>
+    <span class="vol-meter" role="img" aria-label="${c.done} of ${c.planned} sets done"><span style="width:${c.planned?Math.min(100,100*c.done/c.planned):0}%"></span></span>
+    <span class="vol-num">${c.done} / ${c.planned}${selWeek>1?`<small>last week ${p.done}</small>`:''}</span></div>`;
+  $('modalRoot').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeSwap()"><div class="sheet">
+    <h2>Week ${selWeek} · sets per muscle</h2>
+    <p class="sheet-p">Sets done out of planned this week${selWeek>1?', and what you did last week':''}. Skipped sets don't count.</p>
+    <div style="margin-top:12px">
+      ${rows.map(r=>row(`<span class="dot" style="background:var(--mg-${r.mg})"></span>`,cap(r.mg),r.c,r.p)).join('')
+        ||'<p class="sheet-p">Nothing planned this week.</p>'}
+      ${rows.length?row('<span></span>','Total',{done:sum(r=>r.c.done),planned:sum(r=>r.c.planned)},{done:sum(r=>r.p.done)}):''}
+    </div>
+    <div class="sheet-stack"><button class="btn-ghost" onclick="closeSwap()">Close</button></div>
+  </div></div>`;
 }
 
 /* ---------- exercise history ----------
