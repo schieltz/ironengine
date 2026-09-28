@@ -118,7 +118,7 @@ async function bootApp({ now = Date.now(), windowStorage, localStorage, confirm,
   };
   const confirms = [];
   const sandbox = {
-    document, console, navigator: {}, setTimeout: () => 0, clearTimeout() {},
+    document, console, navigator: {}, setTimeout: () => 0, clearTimeout() {}, File: globalThis.File,
     location: { reload() {} },
     confirm: msg => {
       confirms.push(msg);

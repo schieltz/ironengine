@@ -128,6 +128,11 @@ nav button.active{color:var(--blue)}
 .eng-block h3{font-size:15px;font-weight:800;color:var(--blue);letter-spacing:.3px;margin-bottom:6px}
 .eng-block p{font-size:13.5px;color:var(--ink-dim);line-height:1.55}
 .eng-block code{background:var(--panel2);padding:1px 6px;border-radius:5px;font-size:12.5px;color:var(--ink)}
+.nudge{display:flex;align-items:center;gap:8px;margin-top:8px;background:#2B2617;color:#D9C27A;border-radius:9px;
+  padding:6px 6px 6px 12px;font-size:12.5px;font-weight:600;line-height:1.3}
+.nudge span{flex:1}
+.nudge button{min-height:44px;padding:0 12px;border-radius:8px;font-weight:800;font-size:12.5px;color:#D9C27A;
+  border:1px solid rgba(217,194,122,.35)}
 .banner{margin-top:8px;background:#3A1C18;border:1px solid var(--red);color:#F0B8B0;font-size:13px;font-weight:600;
   padding:10px 12px;border-radius:9px;line-height:1.35}
 .sheet-p{color:var(--ink-dim);font-size:14px;line-height:1.45;margin-top:8px}
@@ -195,6 +200,7 @@ nav button.active{color:var(--blue)}
   <div class="h-title" id="hTitle"></div>
   <div class="h-sub" id="hSub"></div>
   <div id="banner"></div>
+  <div id="nudge"></div>
 </header>
 <div class="spine" id="spine"></div>
 <div class="daytabs" id="daytabs"></div>
@@ -576,14 +582,14 @@ function seedState(){
     'Romanian Deadlift':{w:175,date:'2026-07-06'},'Bench Press (Medium Grip)':{w:175,date:'2026-07-06'},
     'Barbell Bent Over Row':{w:120,date:'2026-07-04'},
   };
-  return {v:SCHEMA_VERSION,meso,hist,draft:null,archive:[],custom:[],bodyweight:null};
+  return {v:SCHEMA_VERSION,meso,hist,draft:null,archive:[],custom:[],bodyweight:null,lastBackupAt:null,backupSnooze:null};
 }
 
 /* ---------- state schema ----------
    Saved state carries v; unversioned saves are v1. To change the stored shape:
    bump SCHEMA_VERSION, append the upgrade step to MIGRATIONS, update seedState(),
    and add a migration test. */
-const SCHEMA_VERSION=8;
+const SCHEMA_VERSION=9;
 const MIGRATIONS=[   /* MIGRATIONS[n-1] upgrades a v(n) state to v(n+1), in place */
   /* v1→v2: feedback moves off the exercise (where it applied to every later week) into
      meso.fb[session][exercise]. A legacy answer is attributed to the latest week of that
@@ -640,6 +646,8 @@ const MIGRATIONS=[   /* MIGRATIONS[n-1] upgrades a v(n) state to v(n+1), in plac
   s=>{ s.meso.schedule=s.meso.schedule||[...DAYS]; s.meso.dayOf=s.meso.dayOf||{}; },
   /* v7→v8: bodyweight (lb), counted in the load of weighted dips / pull-ups (R9) */
   s=>{ if(s.bodyweight===undefined) s.bodyweight=null; },
+  /* v8→v9: when the last backup was saved, and a "Later" snooze for the backup reminder */
+  s=>{ s.lastBackupAt=s.lastBackupAt??null; s.backupSnooze=s.backupSnooze??null; },
 ];
 function migrate(s){
   let v=s.v||1;
@@ -936,7 +944,7 @@ const entryAt=ei=>ST.meso.log[key(selWeek,selDay)][ei];
 
 function render(){
   sessCache=new Map();
-  renderHeader(); renderBanner(); renderSpine(); renderTabs();
+  renderHeader(); renderBanner(); renderNudge(); renderSpine(); renderTabs();
   ({workout:renderWorkout,library:renderLibrary,builder:renderBuilder,engine:renderEngine,data:renderData})[view]();
   ['navW','navL','navB','navE','navD'].forEach(id=>$(id).classList.remove('active'));
   $({workout:'navW',library:'navL',builder:'navB',engine:'navE',data:'navD'}[view]).classList.add('active');
@@ -1760,18 +1768,39 @@ async function setBodyweight(v){
   const n=parseFloat(v); ST.bodyweight=n>0?n:null;
   await save(); toast(ST.bodyweight?`Bodyweight ${ST.bodyweight} lb`:'Bodyweight cleared');
 }
+/* ---------- backup reminder ----------
+   Everything lives on this device. Once there's real training data, the Workout view asks for a backup
+   when the last one is BACKUP_EVERY+ days old (or there's none); "Later" hides it until tomorrow. */
+const BACKUP_EVERY=7;
+function backupDue(){
+  if(store.mode==='memory'||loadError) return false;   /* the red banner already covers not-saving */
+  const today=localDate();
+  if(ST.backupSnooze&&ST.backupSnooze>=today) return false;
+  const logged=ST.archive.length>0||Object.values(ST.meso.log).some(es=>es.some(e=>(e.sets||[]).some(s=>s.st==='logged')));
+  return logged&&(!ST.lastBackupAt||daysBetween(ST.lastBackupAt,today)>=BACKUP_EVERY);
+}
+function renderNudge(){
+  const el=$('nudge');
+  if(view!=='workout'||!backupDue()){ el.innerHTML=''; return; }
+  const n=ST.lastBackupAt?daysBetween(ST.lastBackupAt,localDate()):null;
+  el.innerHTML=`<div class="nudge"><span>${n==null?'No backup yet':`Last backup ${n} days ago`}. Your training data lives only on this phone.</span>
+    <button onclick="saveBackup()">Back up</button><button onclick="snoozeBackup()">Later</button></div>`;
+}
+async function markBackedUp(){ ST.lastBackupAt=localDate(); ST.backupSnooze=null; await save(); render(); }
+async function snoozeBackup(){ ST.backupSnooze=localDate(); await save(); render(); }
 const backupJSON=()=>JSON.stringify(ST,null,1);
 async function saveBackup(){
   const name=`ironengine-backup-${localDate()}.json`;
   const file=new File([backupJSON()],name,{type:'application/json'});
   try{ /* iPhone: share sheet → Save to Files / iCloud / AirDrop */
-    if(navigator.canShare&&navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:name}); return; }
+    if(navigator.canShare&&navigator.canShare({files:[file]})){ await navigator.share({files:[file],title:name}); await markBackedUp(); return; }
   }catch(e){ if(e.name==='AbortError') return; }
   const a=document.createElement('a'); a.href=URL.createObjectURL(file); a.download=name;
   document.body.appendChild(a); a.click(); a.remove(); setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  await markBackedUp();
 }
 async function doExport(){
-  try{ await navigator.clipboard.writeText(backupJSON()); toast('Copied'); }
+  try{ await navigator.clipboard.writeText(backupJSON()); toast('Copied'); await markBackedUp(); }
   catch(e){ toast('Clipboard blocked — see console'); console.log(backupJSON()); }
 }
 /* ---------- import RP Hypertrophy history ----------

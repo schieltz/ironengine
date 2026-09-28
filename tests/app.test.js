@@ -1187,3 +1187,45 @@ describe('weekly sets per muscle', () => {
     assert.match(rowFor(app.els.get('modalRoot').innerHTML, 'Biceps'), /0 \/ \d+<small>last week 13<\/small>/);
   });
 });
+
+describe('backup reminder', () => {
+  const DAY = 86400000;
+  const nudge = app => app.els.get('nudge').innerHTML;
+
+  test('asks for a first backup once there is training data; backing up clears it', async () => {
+    const ls = fakeLocalStorage();
+    const app = await bootApp({ now: NOW, localStorage: ls });
+    assert.match(nudge(app), /No backup yet/);
+    await app.run('navigator.canShare = () => true; navigator.share = async () => {};');
+    await app.call('await saveBackup();');
+    assert.equal(app.state().lastBackupAt, '2026-09-25');
+    assert.equal(nudge(app), '');
+  });
+
+  test('comes back 7 days after the last backup, not before', async () => {
+    const ls = fakeLocalStorage();
+    const a = await bootApp({ now: NOW, localStorage: ls });
+    await a.call('await markBackedUp();');
+    assert.equal(nudge(await bootApp({ now: NOW + 6 * DAY, localStorage: ls })), '');
+    assert.match(nudge(await bootApp({ now: NOW + 7 * DAY, localStorage: ls })), /Last backup 7 days ago/);
+  });
+
+  test('"Later" hides it until tomorrow; a cancelled share does not count as a backup', async () => {
+    const ls = fakeLocalStorage();
+    const app = await bootApp({ now: NOW, localStorage: ls });
+    await app.run(`navigator.canShare = () => true; navigator.share = async () => { const e = new Error('x'); e.name = 'AbortError'; throw e; };`);
+    await app.call('await saveBackup();');
+    assert.equal(app.state().lastBackupAt, null);
+    await app.call('await snoozeBackup();');
+    assert.equal(nudge(app), '');
+    assert.match(nudge(await bootApp({ now: NOW + DAY, localStorage: ls })), /No backup yet/);
+  });
+
+  test('not shown when storage is off (the red banner covers that) or on other tabs', async () => {
+    const memory = await bootApp({ now: NOW });
+    assert.equal(nudge(memory), '');
+    const app = await bootApp({ now: NOW, localStorage: fakeLocalStorage() });
+    await app.call("setView('library');");
+    assert.equal(nudge(app), '');
+  });
+});
