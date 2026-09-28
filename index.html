@@ -63,6 +63,8 @@ main{padding:6px 12px}
 .hist-row{display:flex;gap:12px;justify-content:space-between;align-items:flex-start;padding:10px 0;border-top:1px solid var(--line)}
 .hist-row .hr-sets{font-size:15.5px;font-weight:650;font-variant-numeric:tabular-nums}
 .hist-row .hr-when{font-size:12px;color:var(--ink-dim);text-align:right;white-space:nowrap}
+.tag-pr{display:inline-block;margin-left:6px;font-size:9.5px;font-weight:800;letter-spacing:.6px;color:var(--amber);
+  border:1px solid var(--amber);border-radius:5px;padding:1px 5px;vertical-align:middle}
 .tag-dl{display:inline-block;margin-left:6px;font-size:9.5px;font-weight:800;letter-spacing:.6px;color:var(--ink-dim);
   border:1px solid var(--line);border-radius:5px;padding:1px 5px;vertical-align:middle}
 .ex-note{background:#2B2617;color:#D9C27A;font-size:13px;padding:8px 10px;border-radius:8px;margin-top:8px}
@@ -70,6 +72,7 @@ main{padding:6px 12px}
   color:var(--ink-faint);font-size:10.5px;font-weight:700;letter-spacing:1px;text-align:center}
 .set-row{display:grid;grid-template-columns:44px 1fr 1fr 56px;gap:8px;align-items:center;padding:5px 0}
 .set-num{text-align:center;color:var(--ink-faint);font-size:13px;font-weight:700}
+.set-num .pr{display:block;font-size:9px;font-weight:800;letter-spacing:.6px;color:var(--amber);margin-top:1px}
 .set-row input{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:9px;
   padding:11px 4px;font-size:19px;font-weight:700;text-align:center;color:var(--ink)}
 .set-row input:focus{outline:none;border-color:var(--blue)}
@@ -809,6 +812,7 @@ function resumePoint(){
   return last.d<n ? {w:last.w,d:last.d+1} : {w:last.w+1,d:1};
 }
 async function save(){
+  sessCache=null;
   if(loadError) return;   /* never write over data we couldn't read */
   const ok=await store.set('state2',ST);
   if(saveFailed===ok){ saveFailed=!ok; renderBanner(); }
@@ -921,6 +925,7 @@ const exInfo=(name,slot)=>slot&&slot.name===name?slot:(libByName(name)||{name,mg
 const entryAt=ei=>ST.meso.log[key(selWeek,selDay)][ei];
 
 function render(){
+  sessCache=new Map();
   renderHeader(); renderBanner(); renderSpine(); renderTabs();
   ({workout:renderWorkout,library:renderLibrary,builder:renderBuilder,engine:renderEngine,data:renderData})[view]();
   ['navW','navL','navB','navE','navD'].forEach(id=>$(id).classList.remove('active'));
@@ -1004,7 +1009,7 @@ function renderWorkout(){
       ${lastLine(e.name,k)}
       ${own&&slot.note?`<div class="ex-note">📌 ${escHtml(slot.note)}</div>`:''}
       <div class="set-head"><span></span><span>WEIGHT</span><span>REPS</span><span>LOG</span></div>
-      ${sets.map((s,j)=>setRow(i,j,s)).join('')}
+      ${(pr=>sets.map((s,j)=>setRow(i,j,s,j===pr)).join(''))(prIndex(e,k))}
       ${why}
       <div class="card-actions">
         <button class="more" onclick="removeSet(${i})" aria-label="Remove last set" ${sets.length<=1?'disabled':''}>−</button>
@@ -1021,13 +1026,13 @@ function renderWorkout(){
       <div class="sm">Next week's targets are computed from today's numbers.</div></div>`;
   $('main').innerHTML=html;
 }
-function setRow(ei,si,s){
+function setRow(ei,si,s,isPR){
   const repVal=s.st==='skipped'?'':(s.reps!=null?s.reps:(s.tgt!=null?s.tgt:''));
   const repPh=s.st==='skipped'?'skipped':(s.tgt==null&&s.reps==null?`${s.rir??2} RIR`:'');
   const btnCls=s.st==='logged'?'logged':s.st==='skipped'?'skipped':'next';
   const btnTxt=s.st==='logged'?'✓':s.st==='skipped'?'−':'';
   return `<div class="set-row">
-    <span class="set-num">${si+1}</span>
+    <span class="set-num">${si+1}${isPR?'<span class="pr">PR</span>':''}</span>
     <input type="number" inputmode="decimal" id="w-${ei}-${si}" value="${s.w??''}" onchange="upd(${ei},${si},'w',this.value)">
     <input type="number" inputmode="numeric" id="r-${ei}-${si}" class="${repPh?'rir-ph':''}" value="${repVal}" placeholder="${repPh}"
       onchange="upd(${ei},${si},'reps',this.value)">
@@ -1078,7 +1083,13 @@ async function tapLog(ei,si){
     } else{ s.st='logged'; ST.meso.dates[k]=ST.meso.dates[k]||localDate(); const e=entryAt(ei); e.date=e.date||localDate(); }
   }
   s.u=1; skipArm=null;
-  await save(); render();
+  await save();
+  const e=entryAt(ei);
+  if(s.st==='logged'&&prIndex(e,k)===si){
+    const v=bestOf([s],bwExtra(e.name)).v;
+    toast(`New PR: ${fmtSets([s],false)}${s.w||bwExtra(e.name)?` · est. 1RM ${Math.round(v)}`:''}`);
+  }
+  render();
 }
 async function skipRest(ei){
   entryAt(ei).sets.forEach(s=>{ if(!s.st){ s.st='skipped'; s.reps=null; s.u=1; } });
@@ -1104,7 +1115,9 @@ async function addSet(ei){
    Every logged session of an exercise, across the archive (finished and imported mesos) and the current
    meso, oldest first. Undated sessions sort with the nearest earlier dated session of their meso. */
 const isDeloadWeek=(m,w)=>m.source==='rp'?(m.weeks>1&&w===m.weeks):w>RIR_RAMP.length;
+let sessCache=null;   /* per render: every card asks for history; cleared on every save */
 function sessionsOf(name){
+  if(sessCache&&sessCache.has(name)) return sessCache.get(name);
   const out=[], mesos=[...ST.archive,ST.meso];
   mesos.forEach((m,mi)=>{
     const dates=m.dates||{}, first=Object.values(dates).sort()[0]||'';
@@ -1120,7 +1133,9 @@ function sessionsOf(name){
         });
       });
   });
-  return out.sort((a,b)=>a.sortDate.localeCompare(b.sortDate)||a.mi-b.mi||a.w-b.w||a.d-b.d);
+  out.sort((a,b)=>a.sortDate.localeCompare(b.sortDate)||a.mi-b.mi||a.w-b.w||a.d-b.d);
+  if(sessCache) sessCache.set(name,out);
+  return out;
 }
 /* "60 lb × 12, 10, 9 · 55 lb × 8": consecutive sets at one weight grouped */
 function fmtSets(sets,unit=true){
@@ -1140,6 +1155,17 @@ const daysBetween=(a,b)=>{ const t=s=>{ const [y,m,d]=s.split('-').map(Number); 
 function bestOf(sets,extra=0){
   return sets.reduce((b,s)=>{ const load=(s.w||0)+extra, v=load?e1rm(load,s.reps):s.reps; return !b||v>b.v?{...s,v}:b; },null);
 }
+/* PRs: a logged set is a PR when its estimated 1RM (weighted bodyweight work: including bodyweight;
+   bodyweight-only: reps) beats every earlier session of the exercise. Only the session's best set is marked. */
+const bwExtra=name=>{ const l=libByName(name); return l&&l.equip==='Bodyweight Loadable'?(ST.bodyweight||0):0; };
+function prIndex(e,k){
+  const at=ST.meso.dates[k]||localDate(), extra=bwExtra(e.name);
+  const prior=sessionsOf(e.name).filter(s=>!(s.current&&s.k===k)&&s.sortDate<=at).reduce((m,s)=>Math.max(m,bestOf(s.sets,extra).v),0);
+  if(!prior) return -1;
+  let bi=-1, bv=prior;
+  (e.sets||[]).forEach((s,i)=>{ if(s.st==='logged'&&s.reps!=null){ const v=bestOf([s],extra).v; if(v>bv){ bv=v; bi=i; } } });
+  return bi;
+}
 /* The line under each workout card: the latest earlier session of this exercise. */
 function lastLine(name,k){
   const today=localDate(), at=ST.meso.dates[k]||today;
@@ -1157,6 +1183,8 @@ function openHistory(name){
   const best=all.reduce((b,s)=>{ const x=bestOf(s.sets,bw); return !b||x.v>b.v?{...x,date:s.date}:b; },null);
   const last=all[all.length-1];
   histPts=trend.map(s=>({s,b:bestOf(s.sets,bw)}));
+  const prs=new Set(); let run=0;
+  all.forEach((s,i)=>{ const v=bestOf(s.sets,bw).v; if(i>0&&v>run) prs.add(s); run=Math.max(run,v); });
   const kpi=(l,v,sub)=>`<div class="kpi"><div class="kpi-l">${l}</div><div class="kpi-v">${v}</div><div class="kpi-s">${sub}</div></div>`;
   const groups=[]; [...all].reverse().forEach(s=>{ const g=groups[groups.length-1];
     if(g&&g.mi===s.mi) g.rows.push(s); else groups.push({mi:s.mi,meso:s.meso,weeks:s.weeks,current:s.current,rows:[s]}); });
@@ -1171,7 +1199,7 @@ function openHistory(name){
     </div>
     ${histPts.length>1?`<div class="spark"><div class="spark-read" id="sparkRead"></div>${sparkSvg(usesWeight)}</div>`:''}
     ${groups.map(g=>`<div class="hist-meso">${escHtml(g.meso)}${g.current?' · current':''}</div>
-      ${g.rows.map(s=>`<div class="hist-row"><div class="hr-sets">${fmtSets(s.sets)}${s.deload?'<span class="tag-dl">DELOAD</span>':''}</div>
+      ${g.rows.map(s=>`<div class="hist-row"><div class="hr-sets">${fmtSets(s.sets)}${prs.has(s)?'<span class="tag-pr">PR</span>':''}${s.deload?'<span class="tag-dl">DELOAD</span>':''}</div>
         <div class="hr-when">Week ${s.w} · Day ${s.d}<br>${s.date?`${weekdayOf(s.date)} ${fmtDate(s.date)}`:'no date'}</div></div>`).join('')}`).join('')}`
       :`<p class="sheet-p" style="margin-top:18px">No logged sessions yet. They show up here as soon as you log a set.</p>`}
     <div class="sheet-stack">
@@ -1653,6 +1681,9 @@ function renderEngine(){
   <div class="eng-block"><h3>R8 · Soreness (recovery gate)</h3>
     <p>Asked per muscle: still sore → volume held. Never sore + low pump → +${RULES.setAdd} set.
     'Healed just on time' is the optimum — standard progression.</p></div>
+  <div class="eng-block"><h3>PRs</h3>
+    <p>A logged set is marked PR when its estimated 1RM (<code>weight × (1 + reps/${RULES.epley})</code>; weighted dips and pull-ups
+    include bodyweight; bodyweight-only work compares reps) beats every earlier session of that exercise, imported RP history included.</p></div>
   <div class="eng-block"><h3>Changing the weight</h3>
     <p>Change a set's weight before logging it and its rep target is recalculated for the same effort at the week's RIR
     (<code>1RM ≈ weight × (1 + reps/${RULES.epley})</code>, reps counted to failure). Back to the programmed weight restores the

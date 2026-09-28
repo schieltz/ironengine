@@ -1090,7 +1090,7 @@ describe('exercise history', () => {
     assert.match(html, /Est\. 1RM<\/div><div class="kpi-v">293</);  // (65 + 166 bodyweight) x (1 + 8/30) = 292.6
     assert.match(html, /incl\. bodyweight/);
     assert.ok(html.indexOf('Sample meso B') < html.indexOf('New meso plan'), 'newest meso first');
-    assert.match(html, /65 lb × 8<span class="tag-dl">DELOAD<\/span>/);
+    assert.match(html, /65 lb × 8<span class="tag-pr">PR<\/span><span class="tag-dl">DELOAD<\/span>/);
     assert.match(html, /Week 1 · Day 1<br>Sat Aug 1, 2026/);
     assert.match(app.els.get('sparkRead').innerHTML, /Aug 1, 2026 · <b>60 × 8<\/b>/);   // latest non-deload session
   });
@@ -1137,5 +1137,30 @@ describe('history estimates for weighted bodyweight work', () => {
     await app.call('await setBodyweight("165");');
     assert.equal(Math.round(app.run('bestOf([{w:null,reps:12}],165).v')), 231);   // 165 x (1 + 12/30)
     assert.equal(app.run('bestOf([{w:null,reps:12}],0).v'), 12);                   // bodyweight-only: reps
+  });
+});
+
+describe('PR badges', () => {
+  test('a set beating every earlier session is marked PR, with a toast', async () => {
+    const app = await bootApp({ now: NOW });                        // bench before: 120x10 (w1), 120x12 (Wed w2) -> best 168
+    await app.call('await upd(3,0,"w","125"); await upd(3,0,"reps","11"); await tapLog(3,0);');   // 125x11 = 170.8
+    assert.match(app.els.get('toast').textContent, /New PR: 125 × 11 · est\. 1RM 171/);
+    assert.match(app.els.get('main').innerHTML, /<span class="set-num">1<span class="pr">PR<\/span><\/span>/);
+  });
+
+  test('matching or trailing your best is not a PR', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call('await tapLog(3,0);');                             // 120x11 = 164 < 168
+    assert.doesNotMatch(app.els.get('main').innerHTML, /class="pr"/);
+    assert.doesNotMatch(app.els.get('toast')?.textContent || '', /PR/);
+  });
+
+  test('history tags each session that set a new best', async () => {
+    const app = await bootApp({ now: NOW, confirm: () => true });
+    const sample = require('node:fs').readFileSync(require('node:path').join(__dirname, 'fixtures', 'rp-export-sample.json'), 'utf8');
+    await app.call(`await importRPText(${JSON.stringify(sample)}); openHistory('Dip (Weighted, Triceps-Focused)');`);
+    const html = app.els.get('modalRoot').innerHTML;
+    assert.equal((html.match(/tag-pr/g) || []).length, 2);         // Aug 1 and Aug 8 beat the July session
+    assert.match(html, /60 lb × 8<span class="tag-pr">PR<\/span>/);
   });
 });
