@@ -85,7 +85,7 @@ function loadEngine({ now = Date.now() } = {}) {
 function fakeElement() {
   return {
     innerHTML: '', textContent: '',
-    classList: { add() {}, remove() {} },
+    classList: { add() {}, remove() {}, toggle() {} },
   };
 }
 

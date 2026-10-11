@@ -23,7 +23,7 @@ Live: https://schieltz.github.io/ironengine/
 
 ## Data model
 - Saved state `{v, meso, hist, draft, archive, custom, bodyweight, lastBackupAt, backupSnooze}` under key `state2`. `v` = schema version; unversioned saves are v1. Changing the stored shape = bump `SCHEMA_VERSION`, append a step to `MIGRATIONS`, update `seedState()`, add a migration test. `migrate()` runs on load; upgraded state is saved immediately.
-- `ST.meso`: {name, weeks, curWeek, curDay, days[3][slots], seq, log{wNdM: [entries]}, dates{wNdM: date}, schedule[3], dayOf{wNdM: weekday}}
+- `ST.meso`: {name, weeks, curWeek, curDay, days[n][slots], seq, log{wNdM: [entries]}, dates{wNdM: date}, schedule[n], dayOf{wNdM: weekday}, focus?[n]}. `focus` = optional per-day title from a template (shown in the workout header). Drafts carry `schedule` and `focus` into the meso they activate.
 - Weekday labels (v7): `dayLabel(w,d)` = the session's own label (`dayOf`, set from the day picker) → else the weekday of its logged date → else `schedule[d-1]` (the plan; default Mon/Wed/Fri, inherited by the next meso). Tap the selected day tab to pick a weekday, for this session only or every week. Training days stay ordinal (Day 1-3); labels are display only.
 - slot (the plan for sessions not yet started): {id, name, mg, equip, note, pri}. `id` is permanent within the meso (`s1`, `s2`, … from `seq`).
 - entry (one exercise in one session, display order): {slot, name, sets, why, fb, u?, date?}. `date` = local date its first set was logged (RP imports: that exercise's first completed set; sessions often span days). History, the "Last" line and `harvestHistory()` prefer it over the session date. `name` can differ from the slot's (a one-off swap). `fb` = feedback given in that session {soreness, pain, pump, workload}; it shapes only the next week's prescription for that slot. `u` = entry-level touch (swapped or added by hand). v5; before that, sessions were arrays lined up with the plan by position.
@@ -56,7 +56,7 @@ Live: https://schieltz.github.io/ironengine/
 | Weight change | Set's weight edited before logging (no reps typed) → rep target re-derived for equal effort at the week's RIR: Epley on reps-to-failure, `RULES.epley`=30, measured from the originally prescribed weight/target (`pw`/`ptgt` on the set); hint line under the set. The change carries to later sets still at the old weight (not logged, no reps typed) | Inferred (owner request 2026-09-26); calibrate vs RP |
 | Seeding | Wk 1 from hist; >8 wks stale → −10%; maintenance-priority slots start 1 set, full 2 | Design decision |
 
-RIR ramp: 3/2/2/1/0 + deload 8. Three training days per week; weekday labels are editable (see Data model).
+RIR ramp: 3/2/2/1/0 + deload 8. Training days per week = `meso.days.length` (1-7; the demo meso has 3); weekday labels are editable (see Data model). New mesos get `defaultSchedule(n)` unless their template sets one. The workout header estimates session time at `SET_MINUTES` (2.5) per planned set.
 
 ## Calibration evidence
 **2026-09-27, RP data export** (13 mesos, Mar 2025 to Aug 2026, ~3,000 sets). Unlike history screenshots it stores RP's prescribed target (weight, reps, weight range) next to what was done, plus per-session, per-muscle soreness/pump/workload and RP's `recommendedSets`. Kept outside the repo (personal data; the repo is public). Replay of week N actuals → RP's week N+1 targets, 803 exercise pairs, 1,057 targeted sets, deload transitions excluded:

@@ -332,3 +332,11 @@ describe('R9 load or reps (RP export: fits 99% of 1,195 targets)', () => {
     assert.deepEqual(p.sets, [target(200, 8)]);
   });
 });
+
+describe('R7 deload in a 6-day week', () => {
+  test('days 1-3 at ~90%, days 4-6 at ~50%', () => {
+    const DB = { name: 'Dumbbell lift', equip: 'Dumbbell' };
+    assert.equal(E.prescribe(DB, [L(100, 10), L(100, 10)], 6, null, { day: 3, days: 6 }).sets[0].w, 90);
+    assert.equal(E.prescribe(DB, [L(100, 10), L(100, 10)], 6, null, { day: 4, days: 6 }).sets[0].w, 50);
+  });
+});

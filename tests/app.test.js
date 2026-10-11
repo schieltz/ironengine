@@ -1229,3 +1229,16 @@ describe('backup reminder', () => {
     assert.equal(nudge(app), '');
   });
 });
+
+describe('training days per meso', () => {
+  test('default weekday plans by number of training days', async () => {
+    const app = await bootApp({ now: NOW });
+    assert.deepEqual(Array.from(app.run('defaultSchedule(4)')), ['Mon', 'Tue', 'Thu', 'Fri']);
+    assert.deepEqual(Array.from(app.run('defaultSchedule(6)')), ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
+  });
+
+  test('the header estimates session time from its sets', async () => {
+    const app = await bootApp({ now: NOW });
+    assert.match(app.els.get('hSub').textContent, /~\d+ min$/);
+  });
+});

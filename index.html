@@ -37,6 +37,8 @@ header{padding:18px 16px 10px;position:sticky;top:0;background:linear-gradient(v
 .daytabs button{flex:1;padding:9px 0;border-radius:9px;background:var(--panel);border:1px solid var(--line);
   color:var(--ink-dim);font-size:13px;font-weight:700;text-align:center}
 .daytabs button.active{background:var(--panel2);border-color:var(--blue);color:var(--ink)}
+.daytabs.many button{font-size:12px;padding:8px 0}
+.daytabs.many button .st{letter-spacing:0;font-size:8.5px}
 .daytabs button .st{display:block;font-size:9px;margin-top:2px;font-weight:600;letter-spacing:.5px}
 .daytabs button.complete .st{color:var(--green)}
 .daytabs button.partial .st{color:var(--amber)}
@@ -253,8 +255,15 @@ const store = {
   set(k,v){ return this.setRaw(k,JSON.stringify(v)); }
 };
 store.init();
-const DAYS=['Mon','Wed','Fri'];   /* default weekday for each training day; a meso keeps its own in meso.schedule */
+const DAYS=['Mon','Wed','Fri'];   /* the demo meso's weekdays; every meso keeps its own in meso.schedule */
 const WEEKDAYS=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+/* A meso has any number of training days (meso.days.length, 1-7); this is the weekday plan a new one gets */
+const SCHEDULES={1:['Mon'],2:['Mon','Thu'],3:['Mon','Wed','Fri'],4:['Mon','Tue','Thu','Fri'],5:['Mon','Tue','Wed','Thu','Fri'],
+  6:['Mon','Tue','Wed','Thu','Fri','Sat'],7:WEEKDAYS};
+const defaultSchedule=n=>[...(SCHEDULES[n]||WEEKDAYS.slice(0,n))];
+/* session length estimate: sets x minutes per set (work + rest) */
+const SET_MINUTES=2.5;
+const minutesFor=nSets=>Math.round(nSets*SET_MINUTES);
 const MGS=['CHEST','BACK','SHOULDERS','TRICEPS','BICEPS','QUADS','GLUTES','HAMSTRINGS','CALVES','TRAPS','FOREARMS','ABS'];
 
 /* ---------- exercise catalog ----------
@@ -820,7 +829,7 @@ async function init(){
 /* Where the app opens: the latest session with anything logged or skipped, or the one after it
    once it's finished. Nothing logged yet → week 1 day 1. */
 function resumePoint(){
-  const M=ST.meso, weeks=RIR_RAMP.length+1, n=DAYS.length;
+  const M=ST.meso, weeks=RIR_RAMP.length+1, n=M.days.length;
   let last=null;
   for(let w=1;w<=weeks;w++) for(let d=1;d<=n;d++)
     if((M.log[key(w,d)]||[]).some(e=>(e.sets||[]).some(s=>s.st))) last={w,d};
@@ -913,7 +922,7 @@ function prescribeEntry(w,d,e){
   const ex={name:e.name,equip:exInfo(e.name,slot).equip};
   const mgOf=x=>exInfo(x.name,M.days[d-1].find(s=>s.id===x.slot)).mg;
   const firstOfMg=(M.log[key(w,d)]||[]).find(x=>mgOf(x)===mgOf(e));
-  const opts={bodyweight:ST.bodyweight||0,allowAdd:!firstOfMg||firstOfMg===e,day:d,days:DAYS.length};
+  const opts={bodyweight:ST.bodyweight||0,allowAdd:!firstOfMg||firstOfMg===e,day:d,days:M.days.length};
   for(let pw=w-1;pw>=1;pw--){
     const pe=(M.log[key(pw,d)]||[]).find(x=>x.slot===e.slot);
     if(!pe||pe.name!==e.name||!pe.sets) continue;
@@ -953,7 +962,9 @@ function renderHeader(){
   const M=ST.meso;
   const titles={workout:`WEEK ${selWeek} <span class="dim">DAY ${selDay}</span>`,library:'LIBRARY',
     builder:'MESO BUILDER',engine:'THE ENGINE',data:'DATA'};
-  const subs={workout:`${dayLabel(selWeek,selDay)} · ${M.name} · target ${rirFor(selWeek)} RIR`,
+  const sess=(M.log[key(selWeek,selDay)]||[]).flatMap(e=>e.sets||[]).filter(s=>s.st!=='skipped').length;
+  const subs={workout:`${dayLabel(selWeek,selDay)} · ${(M.focus||[])[selDay-1]||M.name} · target ${rirFor(selWeek)} RIR`
+    +(sess?` · ~${minutesFor(sess)} min`:''),
     library:`${libAll().length} exercises · ${ST.custom.length} of them yours`,
     builder: ST.draft?`Draft: ${ST.draft.name}`:'Plan your next mesocycle',
     engine:'Every number, explained. No black box.',data:'Export, reset, storage'};
@@ -972,7 +983,8 @@ function renderSpine(){
 function renderTabs(){
   const el=$('daytabs'); const M=ST.meso;
   if(view!=='workout'){ el.innerHTML=''; return; }
-  el.innerHTML=DAYS.map((_,i)=>{
+  el.classList.toggle('many',M.days.length>4);
+  el.innerHTML=M.days.map((_,i)=>{
     const k=key(selWeek,i+1), log=M.log[k], d=dayLabel(selWeek,i+1), active=i+1===selDay;
     let st='—';
     if(log&&log.length){
@@ -1134,7 +1146,7 @@ async function addSet(ei){
    next to what was done the week before. */
 function weekVolume(w){
   const out={};
-  for(let d=1;d<=DAYS.length;d++) (ST.meso.log[key(w,d)]||[]).forEach(e=>{
+  for(let d=1;d<=ST.meso.days.length;d++) (ST.meso.log[key(w,d)]||[]).forEach(e=>{
     const mg=exInfo(e.name,slotOf(d,e)).mg, o=out[mg]||(out[mg]={planned:0,done:0});
     (e.sets||[]).forEach(s=>{ if(s.st!=='skipped') o.planned++; if(s.st==='logged') o.done++; });
   });
@@ -1142,7 +1154,7 @@ function weekVolume(w){
 }
 async function openVolume(){
   let changed=false;
-  for(let d=1;d<=DAYS.length;d++) if(planDay(selWeek,d)) changed=true;   /* plan the whole week first */
+  for(let d=1;d<=ST.meso.days.length;d++) if(planDay(selWeek,d)) changed=true;   /* plan the whole week first */
   if(changed) await save();
   const cur=weekVolume(selWeek), prev=selWeek>1?weekVolume(selWeek-1):{}, none={planned:0,done:0};
   const rows=MGS.map(mg=>({mg,c:cur[mg]||none,p:prev[mg]||none})).filter(r=>r.c.planned||r.c.done||r.p.done);
@@ -1367,16 +1379,18 @@ function renderBuilder(){
       <div class="mg-tag" style="background:var(--panel2);color:var(--ink-dim)">TEMPLATE LIBRARY</div>
       ${TEMPLATES.map((t,i)=>`<button class="slot" onclick="makeDraftFromTemplate(${i})">
         <span class="li-main"><span class="li-name">${t.name}</span>
-        <span class="li-sub">${t.days.map((d,j)=>ST.meso.schedule[j]+' '+d.length).join(' · ')} slots ·
+        <span class="li-sub">${t.days.length} days · ${t.days.map((d,j)=>(t.schedule||defaultSchedule(t.days.length))[j]+' '+d.length).join(' · ')} slots ·
         ${t.days.flat().filter(s=>s[1]===0).length} maintenance</span></span>
         <span class="swap">Use ›</span></button>`).join('')}`;
     return;
   }
-  const D=ST.draft, dayExs=D.days[bdDay-1];
+  const D=ST.draft, dayExs=D.days[bdDay-1], sched=draftSchedule();
+  const startSets=dayExs.reduce((n,ex)=>n+(ex.pri===0?1:2),0);
   let lastMg='';
   $('main').innerHTML=`
-    <div class="bd-tabs">${ST.meso.schedule.map((d,i)=>`<button class="${bdDay===i+1?'active':''}"
+    <div class="bd-tabs">${sched.map((d,i)=>`<button class="${bdDay===i+1?'active':''}"
       onclick="bdDay=${i+1};render()">${d}</button>`).join('')}</div>
+    <p class="sheet-p" style="margin:0 4px 8px">${(D.focus||[])[bdDay-1]?`<b>${escHtml(D.focus[bdDay-1])}</b> · `:''}starts at ${startSets} sets, ~${minutesFor(startSets)} min</p>
     ${dayExs.map((ex,i)=>{
       const tag=ex.mg!==lastMg?`<span class="mg-tag" style="background:var(--mg-${ex.mg})">${ex.mg}</span>`:'';
       lastMg=ex.mg;
@@ -1392,9 +1406,10 @@ function renderBuilder(){
     <button class="bigbtn" onclick="activateDraft()">Activate meso — archive current</button>
     <button class="bigbtn ghost" onclick="discardDraft()">Discard draft</button>`;
 }
+const draftSchedule=()=>ST.draft.schedule||defaultSchedule(ST.draft.days.length);
 async function makeDraft(){
   const M=ST.meso;
-  ST.draft={name:'Next meso (draft)',weeks:5,
+  ST.draft={name:'Next meso (draft)',weeks:5,schedule:[...M.schedule],focus:M.focus?[...M.focus]:null,
     days:M.days.map(day=>day.map(ex=>({name:ex.name,mg:ex.mg,equip:ex.equip,note:ex.note,pri:ex.pri??1})))};
   bdDay=1; await save(); render();
 }
@@ -1408,7 +1423,8 @@ function autoPick(mg,used){
 }
 async function makeDraftFromTemplate(ti){
   const t=TEMPLATES[ti];
-  ST.draft={name:t.name+' (draft)',weeks:5,days:t.days.map(day=>{
+  ST.draft={name:t.name+' (draft)',weeks:5,schedule:t.schedule?[...t.schedule]:defaultSchedule(t.days.length),
+    focus:t.focus?[...t.focus]:null,days:t.days.map(day=>{
     const used=new Set();
     return day.map(([mg,pri,pinned])=>{
       const c=pinned&&CAT_BY_NAME[pinned]?CAT_BY_NAME[pinned]:autoPick(mg,used);
@@ -1429,7 +1445,7 @@ function renderSwap(){
   $('modalRoot').innerHTML=`<div class="overlay" onclick="if(event.target===this)closeSwap()">
     <div class="sheet">
       ${c.exclude?`<h2>Swap exercise</h2><p class="sheet-p">Replacing <b>${c.exclude}</b></p>`
-        :`<h2>Add exercise</h2><p class="sheet-p">To ${c.mode==='draftAdd'?ST.meso.schedule[bdDay-1]:dayLabel(selWeek,selDay)}</p>`}
+        :`<h2>Add exercise</h2><p class="sheet-p">To ${c.mode==='draftAdd'?draftSchedule()[bdDay-1]:dayLabel(selWeek,selDay)}</p>`}
       <div class="lib-search" style="margin:10px 0 6px"><input placeholder="Search" value="${escHtml(c.q)}"
         oninput="swapCtx.q=this.value;renderSwapList()"></div>
       <div class="chiprow">
@@ -1669,7 +1685,7 @@ async function draftAdd(name){
   const c=libByName(name);
   const a=ST.draft.days[bdDay-1];
   a.splice(afterGroup(a,s=>s.mg,c.mg),0,{name:c.name,mg:c.mg,equip:c.equip,note:null,pri:1,_swapped:true});
-  closeSwap(); await save(); render(); toast(`${c.name} added to ${ST.meso.schedule[bdDay-1]}`);
+  closeSwap(); await save(); render(); toast(`${c.name} added to ${draftSchedule()[bdDay-1]}`);
 }
 async function discardDraft(){
   if(!confirm('Discard this draft? The current meso is not affected.')) return;
@@ -1697,7 +1713,7 @@ async function activateDraft(){
   let seq=0;
   ST.meso={name:D.name.replace(' (draft)','')+' · '+localDate(),weeks:D.weeks,curWeek:1,curDay:1,
     days:D.days.map(day=>day.map(ex=>({id:'s'+(++seq),name:ex.name,mg:ex.mg,equip:ex.equip,note:ex.note,pri:ex.pri??1}))),
-    log:{},dates:{},seq,schedule:[...ST.meso.schedule],dayOf:{}};
+    log:{},dates:{},seq,schedule:[...draftSchedule()],dayOf:{},focus:D.focus?[...D.focus]:null};
   ST.draft=null; selWeek=1; selDay=1;
   await ensureDay(1,1); await save();
   view='workout'; render(); toast('New meso active — history carried forward');
