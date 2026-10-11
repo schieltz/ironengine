@@ -1242,3 +1242,65 @@ describe('training days per meso', () => {
     assert.match(app.els.get('hSub').textContent, /~\d+ min$/);
   });
 });
+
+describe('rolling body-part split template (6 days)', () => {
+  const SPLIT = 'Rolling Body-Part Split (6 days, ~20 min)';
+  const activateSplit = async (opts = {}) => {
+    const app = await bootApp({ now: NOW, confirm: () => true, ...opts });
+    await app.call(`await makeDraftFromTemplate(TEMPLATES.findIndex(t => t.name === ${JSON.stringify(SPLIT)})); await activateDraft();`);
+    return app;
+  };
+
+  test('template drafts 6 days, Mon-Sat, with each day\'s focus and starting time', async () => {
+    const app = await bootApp({ now: NOW });
+    await app.call(`setView('builder'); await makeDraftFromTemplate(TEMPLATES.findIndex(t => t.name === ${JSON.stringify(SPLIT)}));`);
+    const d = app.state().draft;
+    assert.equal(d.days.length, 6);
+    assert.deepEqual(d.schedule, ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
+    assert.deepEqual(d.days[0].map(s => s.name), ['Bench Press (Medium Grip)', 'Dumbbell Press (High Incline)',
+      'Dip (Weighted, Triceps-Focused)', 'Cable Triceps Pushdown (Bar)']);
+    const html = app.els.get('main').innerHTML;
+    assert.equal((html.match(/onclick="bdDay=/g) || []).length, 6);
+    assert.match(html, /<b>Chest \+ triceps<\/b> · starts at 7 sets, ~18 min/);
+  });
+
+  test('activated: 6 day tabs, the day\'s focus and an estimated session time in the header', async () => {
+    const app = await activateSplit();
+    const st = app.state();
+    assert.equal(st.meso.days.length, 6);
+    assert.deepEqual(st.meso.schedule, ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
+    assert.equal((app.els.get('daytabs').innerHTML.match(/<button/g) || []).length, 6);
+    assert.equal(app.els.get('hSub').textContent, 'Mon · Chest + triceps · target 3 RIR · ~18 min');
+    await app.call('await pickDay(6);');
+    assert.match(app.els.get('hSub').textContent, /^Sat · Chest \+ back \(light\) · target 3 RIR · ~10 min/);
+    assert.equal(app.state().meso.log.w1d6.length, 2);
+  });
+
+  test('the app reopens on the next day: Wed -> Thu within the week, Sat -> next Mon', async () => {
+    const ls = fakeLocalStorage();
+    const app = await activateSplit({ localStorage: ls });
+    const finishDay = d => app.call(`await pickDay(${d}); for (let i = 0; i < ST.meso.log.w1d${d}.length; i++) await skipRest(i);`);
+    await finishDay(3);
+    let b = await bootApp({ now: NOW, localStorage: ls });
+    assert.deepEqual([b.run('selWeek'), b.run('selDay')], [1, 4]);
+    await finishDay(6);
+    b = await bootApp({ now: NOW, localStorage: ls });
+    assert.deepEqual([b.run('selWeek'), b.run('selDay')], [2, 1]);
+  });
+
+  test('weekly sets per muscle covers all six days', async () => {
+    const app = await activateSplit();
+    await app.call('await openVolume();');
+    const html = app.els.get('modalRoot').innerHTML;
+    for (const mg of ['Chest', 'Back', 'Shoulders', 'Triceps', 'Biceps', 'Quads', 'Hamstrings', 'Calves']) assert.match(html, new RegExp(`vol-name">${mg}<`));
+    assert.match(html, /vol-name">Chest<\/span>[\s\S]*?0 \/ 6</);          // Mon 2+2, Sat 2
+  });
+
+  test('drafting from a 6-day meso keeps its days and weekday plan', async () => {
+    const app = await activateSplit();
+    await app.call('await makeDraft();');
+    assert.equal(app.state().draft.days.length, 6);
+    assert.deepEqual(app.state().draft.schedule, ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
+  });
+
+});

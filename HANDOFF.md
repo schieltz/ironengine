@@ -39,7 +39,7 @@ Live: https://schieltz.github.io/ironengine/
 - Library dates show the later of history's date and the catalog's `last`.
 - `CATALOG`: 213 built-in exercises, each {name, mg, equip, last, home}: 98 from the owner's RP history (with last-performed dates) plus 115 he approved in the 2026-09-26 library review (`last: null`; decisions pinned in `tests/fixtures/library-review-2026-09-26.json`). 12 muscle groups (`MGS`), including TRAPS and ABS from that review.
 - `ST.custom`: exercises the owner creates, {name, mg, equip, home, last: null, custom: true} (v6). `libAll()` / `libByName()` = catalog + custom; everything the UI offers goes through them. Names are permanent (history is keyed by name) and can't contain `" < > \\`. A custom exercise can be deleted only while unused in the current meso and draft.
-- `TEMPLATES`: 6 RP meso blueprints; slots [MG, priority, optionalPinnedExercise]
+- `TEMPLATES`: RP meso blueprints plus the owner's own; slots [MG, priority, optionalPinnedExercise]; optional `schedule` (weekday per day) and `focus` (title per day). Includes "Rolling Body-Part Split (6 days, ~20 min)" (2026-10-11): Mon chest+triceps, Tue back+biceps, Wed legs (squat), Thu shoulders+arms, Fri legs (hinge+curl), Sat chest+back (light), Sun off; exercises pinned from his most recent RP work, home-compatible where possible; each day starts at 4-7 sets (~10-18 min) so the week 1→2 set step lands sessions around 15-25 min.
 
 ## Engine rules (R1–R8)
 | Rule | Behavior | Validation |
